@@ -116,6 +116,6 @@ test('oven carrots recirculate into a cake on the ramp', () => {
   assert.equal(m.score.red.totals.oven, 6);
   assert.equal(m.inv.blue.depotCarrots, startDepotBlue + 3, 'carrots handed to the opposing depot');
   assert.equal(m.inv.red.cakeBank, 8);
-  const cakes = m.pieces.filter((p) => p.type === 'cake' && p.st !== 'table');
-  assert.equal(cakes.length, 1, 'a cake was rolled down the ramp');
+  assert.equal(m.inv.red.rampCakes, 1, 'the baked cake is stored at the ramp');
+  assert.equal(m.pieces.filter((p) => p.type === 'cake' && p.st !== 'table').length, 0, 'nothing rolls down without a robot waiting');
 });
