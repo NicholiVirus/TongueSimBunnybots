@@ -13,7 +13,7 @@ const PIECE_I = PIECE.length ** 2 / 12 + PR ** 2 / 4; // inertia / mass
 const GRAV = 9.81;
 const HOLD_SPACING = 0.16;
 export const RAMP_WAIT = 3; // s a robot must sit at the foot of the ramp before cakes roll
-export const RAMP_GAP = 1.5; // s between cakes rolling down
+export const RAMP_GAP = 0.5; // s between cakes rolling down
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));

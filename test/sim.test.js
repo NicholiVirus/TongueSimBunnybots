@@ -29,7 +29,7 @@ test('cakes stay stored on the ramp until a robot waits at the bottom', () => {
   assert.equal(m.inv.red.rampCakes, 2, 'nothing rolls until the robot has waited 3 s');
   for (let i = 0; i < 60 * 3.5; i++) m.step();
   assert.equal(m.inv.red.rampCakes, 0);
-  assert.equal(r.held.length, 2, 'both cakes rolled straight into the waiting robot, 1.5 s apart');
+  assert.equal(r.held.length, 2, 'both cakes rolled straight into the waiting robot, 0.5 s apart');
 });
 
 test('auto-roll setting sends cakes down without a catcher', () => {

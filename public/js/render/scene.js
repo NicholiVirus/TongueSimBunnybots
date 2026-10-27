@@ -37,6 +37,7 @@ export class SceneView {
 
     this.addLights();
     this.scene.add(buildField());
+    this.rampSigns = Object.fromEntries(F.ALLIANCES.map((a) => [a, this.makeRampSign(a)]));
     this.pieces = new PieceLayer(this.scene);
     this.robots = new Map();
     this.mode = 'menu';
@@ -76,6 +77,47 @@ export class SceneView {
       p.position.set(x, 9, 0);
       this.scene.add(p);
     }
+  }
+
+  // Scoreboard-style sign above each RAMP showing how many CARROT CAKES are stored there.
+  makeRampSign(a) {
+    const c = document.createElement('canvas');
+    c.width = 256;
+    c.height = 128;
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.31), new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }));
+    const s = F.sideSign(a);
+    sign.position.set(s * (F.FIELD.halfL - 0.05), F.OVEN.rampHigh + 0.45, -F.OVEN.yc);
+    sign.rotation.y = s > 0 ? -Math.PI / 2 : Math.PI / 2; // face into the field
+    this.scene.add(sign);
+    const st = { c, tex, sign, a, n: -1 };
+    this.drawRampSign(st, 0);
+    return st;
+  }
+
+  drawRampSign(st, n) {
+    const g = st.c.getContext('2d');
+    g.fillStyle = st.a === 'red' ? '#7d1a1f' : '#15347a';
+    g.fillRect(0, 0, 256, 128);
+    g.strokeStyle = '#ffffff';
+    g.lineWidth = 6;
+    g.strokeRect(3, 3, 250, 122);
+    g.fillStyle = '#ffd84a';
+    g.font = 'bold 30px "Barlow Condensed", Arial Narrow, sans-serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText('CAKES STORED', 128, 30);
+    g.fillStyle = '#ffffff';
+    g.font = 'bold 76px "Barlow Condensed", Arial Narrow, sans-serif';
+    g.fillText(String(n), 128, 84);
+    st.tex.needsUpdate = true;
+    st.n = n;
+  }
+
+  setRampSign(a, n) {
+    const st = this.rampSigns[a];
+    if (st.n !== n) this.drawRampSign(st, n);
   }
 
   setQuality(q) {
@@ -172,6 +214,7 @@ export class SceneView {
       if (rv) rv.update(st, dt);
     }
     this.pieces.update(view.pieces);
+    for (const a of F.ALLIANCES) this.setRampSign(a, view.snap.inv?.[a]?.[3] ?? 0);
     this.updateCamera(view, dt);
     this.renderer.render(this.scene, this.camera);
   }

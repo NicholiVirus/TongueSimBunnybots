@@ -500,7 +500,12 @@ export class Bot {
 
   rampTask(m, r) {
     const a = r.alliance;
-    if (m.autoRamp || m.inv[a].rampCakes <= 0 || m.phase === 'auto') return null;
+    const inv = m.inv[a];
+    if (m.autoRamp || inv.rampCakes <= 0 || m.phase === 'auto') return null;
+    // let cakes stock up and grab a full load of 3; take them one by one only when no more are
+    // coming (no trades left / pending) or time is getting short
+    const moreComing = inv.cakeBank > 0 || inv.ovenCarrots > 0;
+    if (inv.rampCakes < F.MAX_HELD && moreComing && m.timeLeft > 50) return null;
     if ((m.bots || []).some((b) => b !== this && b.task?.kind === 'ramp' && m.robotById(b.id)?.alliance === a)) return null;
     if (![0, 1, 2].some((l) => shelfFit(m.shelfXs(a, l), 0, a) !== null)) return null;
     const s = F.sideSign(a);
