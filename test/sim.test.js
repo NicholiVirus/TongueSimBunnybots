@@ -4,6 +4,16 @@ import { Match, TICK } from '../shared/sim.js';
 import { Bot } from '../shared/bot.js';
 import * as F from '../shared/field.js';
 
+test('bots grab their table cake during AUTO', () => {
+  const m = fullBotMatch();
+  const tableCakes = m.pieces.filter((p) => p.st === 'table');
+  while (m.phase !== 'teleop') {
+    for (const b of m.bots) b.update(m, TICK);
+    m.step(TICK);
+  }
+  for (const c of tableCakes) assert.notEqual(c.st, 'table', `cake at x=${c.x.toFixed(2)} still on the table after AUTO`);
+});
+
 function fullBotMatch() {
   const slots = [];
   for (const alliance of ['red', 'blue']) for (const station of [1, 2, 3]) slots.push({ id: `${alliance}${station}`, alliance, station, robot: ['team', 'speedy', 'tank'][station - 1], bot: true });

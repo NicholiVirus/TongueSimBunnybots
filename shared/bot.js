@@ -397,7 +397,7 @@ export class Bot {
         if (p.z > 0.05 && p.st === 'floor') continue;
         if (nearZone(p.x, p.y, [oppK, oppF], r.cfg.length * 1.6)) continue;
         if (Math.abs(p.x) > F.FIELD.halfL - 0.4 || Math.abs(p.y) > F.FIELD.halfW - 0.4) continue;
-        if (nearElement(p.x, p.y)) continue;
+        if (p.st !== 'table' && nearElement(p.x, p.y)) continue; // table cakes sit on an element but are reachable over the 4" rail
         if (this.claimedByAlly(m, r, p.id)) continue;
         if (cakeAvailable && p.type !== 'cake') continue;
         if (p.type === 'cake' && !this.cakeWorthChasing(m, r, p)) continue;
