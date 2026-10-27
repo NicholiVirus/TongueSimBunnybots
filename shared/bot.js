@@ -39,12 +39,13 @@ function getGrid(rad, alliance) {
   const opp = F.opponent(alliance);
   const k = F.kitchenPoly(opp);
   const f = F.farmPoly(opp);
+  const tz = F.tableZonePoly(opp);
   for (let i = 0; i < NX; i++) {
     for (let j = 0; j < NY; j++) {
       const x = cx(i);
       const y = cy(j);
       if (inflatedBlocked(x, y, rad)) g[i * NY + j] = 0;
-      else g[i * NY + j] = F.pointInPoly(x, y, k) || F.pointInPoly(x, y, f) ? 6 : 1;
+      else g[i * NY + j] = F.pointInPoly(x, y, k) || F.pointInPoly(x, y, f) || F.pointInPoly(x, y, tz) ? 30 : 1;
     }
   }
   gridCache.set(key, g);
@@ -248,15 +249,16 @@ export class Bot {
       dx /= d;
       dy /= d;
     }
-    // avoid other robots
+    // avoid other robots — and give opponents a wide berth in ENDGAME (G11/G12 fouls)
     for (const o of m.robots) {
       if (o === r) continue;
       const ox = r.x - o.x;
       const oy = r.y - o.y;
       const od = Math.hypot(ox, oy);
-      const lim = (r.cfg.length + o.cfg.length) / 2 + 0.45;
-      if (od < lim && od > 1e-3 && remaining > 0.6) {
-        const k = ((lim - od) / lim) * 1.4;
+      const careful = o.alliance !== r.alliance && (m.isEndgame || protectedZone(o) || nearZone(r.x, r.y, [F.kitchenPoly(o.alliance), F.farmPoly(o.alliance)], r.cfg.length / 2));
+      const lim = (r.cfg.length + o.cfg.length) / 2 + (careful ? 1.0 : 0.45);
+      if (od < lim && od > 1e-3 && (remaining > 0.6 || careful)) {
+        const k = ((lim - od) / lim) * (careful ? 3 : 1.4);
         dx += (ox / od) * k;
         dy += (oy / od) * k;
       }
@@ -331,7 +333,7 @@ export class Bot {
     // ENDGAME: go park in the TABLE ZONE
     const parkSpot = this.parkSpot(r);
     const parkDist = Math.hypot(parkSpot.goal[0] - r.x, parkSpot.goal[1] - r.y);
-    if (m.phase === 'teleop' && m.timeLeft < parkDist / (r.cfg.maxSpeed * 0.55) + 4) return parkSpot;
+    if (m.phase === 'teleop' && m.timeLeft < parkDist / (r.cfg.maxSpeed * 0.5) + 7) return parkSpot;
 
     // keep a task that is still valid (avoid dithering)
     if (this.task && !this.task.done && this.task.kind !== 'park' && m.time - this.task.since < 6) {
@@ -340,7 +342,9 @@ export class Bot {
       if (this.task.kind === 'depot' && r.held.length < F.MAX_HELD) return this.task;
     }
 
-    const wantScore = r.held.length >= F.MAX_HELD || (r.held.length > 0 && !this.nearbyPiece(m, r, 3.0));
+    // a reachable CARROT CAKE is worth a detour before scoring (8-12 on a shelf vs 3-5 for a carrot)
+    const cakeAvailable = r.held.length < F.MAX_HELD && m.pieces.some((p) => p.type === 'cake' && this.cakeWorthChasing(m, r, p));
+    const wantScore = r.held.length >= F.MAX_HELD || (r.held.length > 0 && !cakeAvailable && !this.nearbyPiece(m, r, 3.0));
     if (wantScore) {
       const t = this.scoreTask(m, r);
       if (t) return t;
@@ -357,18 +361,20 @@ export class Bot {
         if (p.st === 'table' && p.x * s < 0) continue;
         if (auto && p.x * s < 0.6) continue;
         if (p.z > 0.05 && p.st === 'floor') continue;
-        if (F.pointInPoly(p.x, p.y, oppK) || F.pointInPoly(p.x, p.y, oppF)) continue;
+        if (nearZone(p.x, p.y, [oppK, oppF], r.cfg.length)) continue;
         if (Math.abs(p.x) > F.FIELD.halfL - 0.4 || Math.abs(p.y) > F.FIELD.halfW - 0.4) continue;
         if (nearElement(p.x, p.y)) continue;
         if (this.claimedByAlly(m, r, p.id)) continue;
-        const d = Math.hypot(p.x - r.x, p.y - r.y) * (p.type === 'cake' ? 0.6 : 1);
+        if (cakeAvailable && p.type !== 'cake') continue;
+        if (p.type === 'cake' && !this.cakeWorthChasing(m, r, p)) continue;
+        const d = Math.hypot(p.x - r.x, p.y - r.y) * (p.type === 'cake' ? 0.35 : 1);
         if (d < bd) {
           bd = d;
           best = p;
         }
       }
       // DEPOT run when nothing is close
-      const depotT = m.inv[a].depotCarrots > 0 && !auto ? this.depotTask(m, r) : null;
+      const depotT = m.inv[a].depotCarrots > 0 && !auto && m.timeLeft > F.TIMING.endgame + 10 ? this.depotTask(m, r) : null;
       const depotD = depotT ? Math.hypot(depotT.goal[0] - r.x, depotT.goal[1] - r.y) : Infinity;
       if (best && bd < depotD + 1.5) {
         // approach so the roller lines up with the piece axis (two possible sides)
@@ -401,6 +407,23 @@ export class Bot {
     return { kind: 'idle', goal: [s * 3.2, 0.5 * (r.station - 2)], since: m.time };
   }
 
+  // Only chase a cake if there's a free shelf slot and time to get it there before ENDGAME parking.
+  cakeWorthChasing(m, r, p) {
+    if (p.st !== 'floor' && p.st !== 'table') return false;
+    const s = F.sideSign(r.alliance);
+    if (p.st === 'table' && p.x * s < 0) return false;
+    if (p.st === 'floor' && p.z > 0.05) return false;
+    if (m.phase === 'auto' && p.x * s < 0.6) return false;
+    if (nearZone(p.x, p.y, [F.kitchenPoly(F.opponent(r.alliance)), F.farmPoly(F.opponent(r.alliance))], r.cfg.length)) return false;
+    if (nearElement(p.x, p.y) && p.st !== 'table') return false;
+    if (this.claimedByAlly(m, r, p.id)) return false;
+    if (!m.pantry[r.alliance].some((lvl) => lvl.some((id) => !id))) return false;
+    const v = r.cfg.maxSpeed * 0.55;
+    const pantryX = s * (F.PANTRY.x0 + F.PANTRY.x1) * 0.5;
+    const trip = Math.hypot(p.x - r.x, p.y - r.y) / v + Math.hypot(pantryX - p.x, F.PANTRY.yFront - p.y) / v + 3;
+    return m.timeLeft - trip > F.TIMING.endgame * 0.6;
+  }
+
   nearbyPiece(m, r, dist) {
     return m.pieces.some((p) => p.st === 'floor' && p.z < 0.05 && Math.hypot(p.x - r.x, p.y - r.y) < dist && !nearElement(p.x, p.y));
   }
@@ -429,7 +452,9 @@ export class Bot {
     const a = r.alliance;
     const s = F.sideSign(a);
     const e = r.cfg.elevator;
-    const heldTop = m.pieces.find((p) => p.id === r.held[r.held.length - 1]);
+    // the mechanism scores cakes first at the pantry, carrots first at the oven
+    const heldTypes = r.held.map((id) => m.pieces.find((p) => p.id === id)?.type);
+    const heldTop = { type: heldTypes.includes('cake') ? 'cake' : 'carrot' };
     const levels = [2, 1, 0].filter((l) => e.setpoints[['l1', 'l2', 'l3'][l]] <= e.max);
     const pantry = m.pantry[a];
     const count = (l) => pantry[l].filter(Boolean).length;
@@ -462,7 +487,7 @@ export class Bot {
       };
     }
     // pantry full and holding a cake: worth more as HARVEST HAUL (3) than in the oven (1)
-    if (heldTop?.type === 'cake') return { ...this.parkSpot(r), kind: 'park', since: m.time };
+    if (!heldTypes.includes('carrot')) return { ...this.parkSpot(r), kind: 'park', since: m.time };
     // pantry full -> OVEN through the kitchen-side mouth
     const gx = s * ((F.OVEN.mouthX0 + F.OVEN.mouthX1) / 2 + 0.05);
     const gy = F.OVEN.y1 + half + 0.02;
@@ -484,6 +509,26 @@ export class Bot {
     const gy = sp.e[1] + sp.n[1] * (half + 0.06);
     return { kind: 'park', goal: [gx, gy], heading: Math.atan2(-sp.n[1], -s * sp.n[0]), since: 0 };
   }
+}
+
+// opponent robot sitting in one of its protected zones (KITCHEN, FARM, TABLE ZONE)
+function protectedZone(o) {
+  return [F.kitchenPoly(o.alliance), F.farmPoly(o.alliance), F.tableZonePoly(o.alliance)].some((z) => F.pointInPoly(o.x, o.y, z));
+}
+
+function nearZone(x, y, zones, margin) {
+  for (const z of zones) {
+    for (const [dx, dy] of [
+      [0, 0],
+      [margin, 0],
+      [-margin, 0],
+      [0, margin],
+      [0, -margin],
+    ]) {
+      if (F.pointInPoly(x + dx, y + dy, z)) return true;
+    }
+  }
+  return false;
 }
 
 function nearElement(x, y) {

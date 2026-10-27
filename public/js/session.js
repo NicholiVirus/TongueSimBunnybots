@@ -2,7 +2,7 @@
 //   LocalSession — runs the shared Match in the browser (offline practice).
 //   NetSession   — talks to the server; predicts your own drivetrain, interpolates the rest.
 
-import { Match, TICK, driveStep, collideRobotStatic } from '/shared/sim.js';
+import { Match, TICK, driveStep, collideRobotStatic, assistInput } from '/shared/sim.js';
 import { Bot } from '/shared/bot.js';
 import { getRobotConfig } from '/shared/robots.js';
 
@@ -64,7 +64,7 @@ class Interp {
   }
 }
 
-const toSimInput = (i) => ({ seq: i.seq, mx: i.mx, my: i.my, rot: i.rot, intake: !!i.in, score: !!i.sc, eject: !!i.ej, sp: i.sp || null, autoStow: i.as !== false });
+const toSimInput = (i) => ({ seq: i.seq, mx: i.mx, my: i.my, rot: i.rot, intake: !!i.in, score: !!i.sc, eject: !!i.ej, align: !!i.al, sp: i.sp || null, autoStow: i.as !== false });
 
 // ------------------------------------------------------------------ offline
 export class LocalSession {
@@ -158,7 +158,7 @@ export class NetSession {
     this.pending = this.pending.filter((p) => p.seq > ack);
     const en = s.ph === 'auto' || s.ph === 'teleop';
     for (const p of this.pending) {
-      driveStep(base, p.inp, TICK, en);
+      driveStep(base, assistInput(base, toSimInput(p.inp), this.me.alliance), TICK, en);
       collideRobotStatic(base);
     }
     if (this.pred) {
@@ -178,7 +178,7 @@ export class NetSession {
     if (this.pred && latest) {
       const en = latest.ph === 'auto' || latest.ph === 'teleop';
       this.pred.elev = latest.r.find((q) => q[0] === this.you)?.[4] ?? this.pred.elev;
-      driveStep(this.pred, inp, TICK, en);
+      driveStep(this.pred, assistInput(this.pred, toSimInput(inp), this.me.alliance), TICK, en);
       collideRobotStatic(this.pred);
       this.pending.push({ seq: inp.seq, inp });
       if (this.pending.length > 120) this.pending.shift();

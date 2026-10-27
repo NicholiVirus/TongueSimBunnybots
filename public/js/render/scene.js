@@ -195,7 +195,7 @@ export class SceneView {
       }
       case 'chase': {
         if (!me) break;
-        this.chaseYaw = k > 1 ? me.th : dampAngle(this.chaseYaw, me.th, 3.2, dt);
+        this.chaseYaw = k > 1 ? me.th : dampAngle(this.chaseYaw, me.th, 10, dt);
         const back = 3.1;
         pos = new THREE.Vector3(me.x - Math.cos(this.chaseYaw) * back, 2.35 + me.elev * 0.3, -(me.y - Math.sin(this.chaseYaw) * back));
         look = new THREE.Vector3(me.x + Math.cos(this.chaseYaw) * 2.2, 0.35, -(me.y + Math.sin(this.chaseYaw) * 2.2));

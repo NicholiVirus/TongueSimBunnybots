@@ -150,6 +150,66 @@ export function driveStep(r, inp, dt, enabled = true) {
   r.th = wrap(r.th + r.w * dt);
 }
 
+// ------------------------------------------------------------------ auto-align (shared with client prediction)
+// Holding ALIGN steers the robot onto the nearest own scoring spot:
+//  PANTRY — heading + distance are locked, the driver can only slide left/right (snaps to slot centers).
+//  OVEN   — drives fully onto the nearest mouth (kitchen side, farm side or the tag face).
+export function alignTarget(r, alliance) {
+  const s = F.sideSign(alliance);
+  const half = r.cfg.length / 2;
+  const pb = F.pantryBox(alliance);
+  const ob = F.ovenBox(alliance);
+  const mouthX = (s * (F.OVEN.mouthX0 + F.OVEN.mouthX1)) / 2;
+  const cands = [
+    { kind: 'pantry', x: clamp(r.x, pb.x0 + 0.2, pb.x1 - 0.2), y: F.PANTRY.yFront - half - 0.01, th: Math.PI / 2 },
+    { kind: 'oven', x: mouthX, y: ob.y1 + half + 0.02, th: -Math.PI / 2 },
+    { kind: 'oven', x: mouthX, y: ob.y0 - half - 0.02, th: Math.PI / 2 },
+    { kind: 'oven', x: s > 0 ? ob.x0 - half - 0.02 : ob.x1 + half + 0.02, y: F.OVEN.yc, th: s > 0 ? 0 : Math.PI },
+  ];
+  let best = null;
+  let bd = 2.6;
+  for (const c of cands) {
+    const d = Math.hypot(c.x - r.x, c.y - r.y);
+    if (d < bd) {
+      bd = d;
+      best = c;
+    }
+  }
+  return best;
+}
+
+export function assistInput(r, inp, alliance) {
+  if (!inp.align) return inp;
+  const t = alignTarget(r, alliance);
+  if (!t) return inp;
+  const c = r.cfg;
+  const toCmd = (err, gain) => clamp((err * gain) / c.maxSpeed, -1, 1);
+  const out = { ...inp, rot: clamp((wrap(t.th - r.th) * 4) / c.maxOmega, -1, 1) };
+  if (t.kind === 'pantry') {
+    const lateral = inp.mx || 0;
+    if (Math.abs(lateral) > 0.05) out.mx = lateral * 0.6;
+    else {
+      // detent onto the nearest slot center
+      const s = F.sideSign(alliance);
+      let sx = t.x;
+      let bd = Infinity;
+      for (let i = 0; i < F.PANTRY.slots; i++) {
+        const x = F.pantrySlotX(i, s);
+        if (Math.abs(x - r.x) < bd) {
+          bd = Math.abs(x - r.x);
+          sx = x;
+        }
+      }
+      out.mx = toCmd(sx - r.x, 3.5);
+    }
+    out.my = toCmd(t.y - r.y, 3.5);
+  } else {
+    out.mx = toCmd(t.x - r.x, 3.5);
+    out.my = toCmd(t.y - r.y, 3.5);
+  }
+  return out;
+}
+
 export function collideRobotStatic(r) {
   let hit = false;
   for (let iter = 0; iter < 2; iter++) {
@@ -346,7 +406,8 @@ export class Match {
     r.elev += clamp(target - r.elev, -e.speed * dt, e.speed * dt);
     r.intake = en && !!inp.intake && r.held.length < F.MAX_HELD;
 
-    driveStep(r, inp, dt, en);
+    if (en && inp.align && !alignTarget(r, r.alliance)) this.denied(r, 'Nothing to align to — get near your PANTRY or OVEN');
+    driveStep(r, assistInput(r, inp, r.alliance), dt, en);
     collideRobotStatic(r);
 
     if (!en) return;
@@ -436,7 +497,7 @@ export class Match {
       }
       if (best < 0) return this.denied(r, `LEVEL ${level + 1} is full`);
       if (bd > 0.7) return this.denied(r, 'Line up with an open slot');
-      const p = this.popHeld(r);
+      const p = this.popHeld(r, 'cake');
       shelf[best] = p.id;
       const to = { x: F.pantrySlotX(best, F.sideSign(a)), y: (F.PANTRY.yFront + F.PANTRY.yBack) / 2 + 0.005, z: F.PANTRY.shelfZ[level], th: 0 };
       this.startPlace(p, r, to, 'pantry', 0.22);
@@ -466,7 +527,7 @@ export class Match {
       for (const f of faces) {
         if (!f.ok) continue;
         if (fwdX * f.n[0] + fwdY * f.n[1] < Math.cos((40 * Math.PI) / 180)) continue;
-        const p = this.popHeld(r);
+        const p = this.popHeld(r, 'carrot');
         const to = { x: (mx0 + mx1) / 2, y: F.OVEN.yc, z: 0.2, th: 0 };
         this.startPlace(p, r, to, 'oven', 0.3);
         p.owner = a;
@@ -494,8 +555,18 @@ export class Match {
     if (r.held.length === 0 && r.input.autoStow !== false) r.elevTarget = 'stow';
   }
 
-  popHeld(r) {
-    const id = r.held.pop();
+  // The mechanism hands over the preferred piece type first (cakes to the pantry, carrots to the oven).
+  popHeld(r, prefer) {
+    let idx = r.held.length - 1;
+    if (prefer) {
+      for (let i = r.held.length - 1; i >= 0; i--) {
+        if (this.pieces.find((q) => q.id === r.held[i])?.type === prefer) {
+          idx = i;
+          break;
+        }
+      }
+    }
+    const id = r.held.splice(idx, 1)[0];
     const p = this.pieces.find((q) => q.id === id);
     const hp = this.heldWorldPos(r, r.held.length);
     Object.assign(p, hp);

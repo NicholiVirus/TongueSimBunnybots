@@ -19,16 +19,19 @@ npm start          # http://localhost:3000
 | --- | --- | --- |
 | Drive | W A S D | Left stick |
 | Rotate | Q / E or ← / → | Right stick |
-| Intake (hold) | Space | RT |
+| Intake (hold) | Shift | RT |
+| Auto-align to PANTRY / OVEN (hold) | Space | LT |
 | Elevator: L1 / L2 / L3 | 1 / 2 / 3 | A / B / Y |
 | Elevator: OVEN / stow | 4 / R | X / LB |
 | Score (hold) | F | RB |
-| Eject a piece | G | LT |
+| Eject a piece | G | D-pad down |
 | Camera (driver station, chase, overhead, broadcast) | C | View |
 | Field / robot-oriented | V | L-stick click |
 | Mini-map / chat / pause | M / T / Esc | Menu |
 
 Driving is field-oriented **from your camera's point of view** (driver station = like the real alliance wall).
+
+**Auto-align:** hold Space near your PANTRY and the robot locks its heading and distance to the shelves — you can only slide left/right (it snaps to slot centers), then press F. Near your OVEN it drives itself onto the closest mouth. When a robot carries both, cakes go to the pantry first and carrots to the oven first.
 
 ## The game (as implemented)
 

@@ -287,6 +287,7 @@ function sanitizeInput(i) {
     intake: !!i?.in,
     score: !!i?.sc,
     eject: !!i?.ej,
+    align: !!i?.al,
     sp: typeof i?.sp === 'string' ? i.sp.slice(0, 6) : null,
     autoStow: i?.as !== false,
   };

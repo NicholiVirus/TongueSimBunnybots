@@ -34,6 +34,7 @@ export class Input {
     this.keys.add(e.code);
     if (SP_KEYS[e.code]) this.setSp(SP_KEYS[e.code]);
     if (e.code === 'KeyG') this.ejectHold = 3;
+    if (e.code === 'KeyF' || e.code === 'Enter') this.scoreHold = 6; // a quick tap still scores
     if (e.code === 'KeyC') this.actions.push('camera');
     if (e.code === 'KeyV') this.actions.push('orient');
     if (e.code === 'KeyM') this.actions.push('minimap');
@@ -60,8 +61,10 @@ export class Input {
     let fwd = (k.has('KeyW') ? 1 : 0) - (k.has('KeyS') ? 1 : 0);
     let strafe = (k.has('KeyD') ? 1 : 0) - (k.has('KeyA') ? 1 : 0);
     let rot = (k.has('KeyQ') || k.has('ArrowLeft') || k.has('KeyJ') ? 1 : 0) - (k.has('KeyE') || k.has('ArrowRight') || k.has('KeyL') ? 1 : 0);
-    let intake = k.has('Space');
-    let score = k.has('KeyF') || k.has('Enter') || k.has('ShiftRight');
+    let intake = k.has('ShiftLeft') || k.has('ShiftRight');
+    let align = k.has('Space');
+    let score = k.has('KeyF') || k.has('Enter') || this.scoreHold > 0;
+    if (this.scoreHold > 0) this.scoreHold--;
     const kbd = Math.hypot(fwd, strafe);
     if (kbd > 1) {
       fwd /= kbd;
@@ -85,7 +88,9 @@ export class Input {
       if (this.enabled) {
         if (b(7)) intake = true;
         if (b(5)) score = true;
-        if (edge(6)) this.ejectHold = 3;
+        if (edge(5)) this.scoreHold = 6;
+        if (b(6)) align = true;
+        if (edge(13)) this.ejectHold = 3;
         for (const [i, sp] of Object.entries(PAD_SP)) if (edge(Number(i))) this.setSp(sp);
         if (edge(8)) this.actions.push('camera');
         if (edge(10)) this.actions.push('orient');
@@ -109,7 +114,7 @@ export class Input {
     const mx = fx * fwd + rx2 * strafe;
     const my = fy * fwd + ry2 * strafe;
 
-    const out = { mx: round(mx), my: round(my), rot: round(rot), in: intake, sc: score, ej: this.ejectHold > 0, as: autoStow };
+    const out = { mx: round(mx), my: round(my), rot: round(rot), in: intake, sc: score, ej: this.ejectHold > 0, al: align, as: autoStow };
     if (this.spHold > 0) {
       out.sp = this.sp;
       this.spHold--;

@@ -150,7 +150,7 @@
         <div class="rs-tags" id="rs-tags"></div>
       </div>
       <div class="keys-hint" id="keys-hint">
-        <b>WASD</b> drive · <b>Q/E ←/→</b> turn · <b>Space</b> intake · <b>1/2/3</b> L1–L3 · <b>4</b> oven · <b>R</b> stow · <b>F</b> score · <b>G</b> eject · <b>C</b> camera · <b>V</b> field/robot · <b>Esc</b> menu
+        <b>WASD</b> drive · <b>Q/E ←/→</b> turn · <b>Shift</b> intake · <b>Space</b> auto-align · <b>1/2/3</b> L1–L3 · <b>4</b> oven · <b>R</b> stow · <b>F</b> score · <b>G</b> eject · <b>C</b> camera · <b>V</b> field/robot · <b>Esc</b> menu
       </div>
       <div class="ingame-chat hidden" id="ingame-chat">
         <div class="chat-log" id="chat-log2"></div>
@@ -207,7 +207,8 @@
           <table class="keys">
             <tr><td>W A S D</td><td>Drive (field-oriented from your camera)</td></tr>
             <tr><td>Q / E · ← / →</td><td>Rotate</td></tr>
-            <tr><td>Space (hold)</td><td>Run intake</td></tr>
+            <tr><td>Shift (hold)</td><td>Run intake</td></tr>
+            <tr><td>Space (hold)</td><td>Auto-align to PANTRY / OVEN (at the pantry you can only slide left/right)</td></tr>
             <tr><td>1 / 2 / 3</td><td>Elevator to PANTRY LEVEL 1 / 2 / 3</td></tr>
             <tr><td>4</td><td>Elevator to OVEN</td></tr>
             <tr><td>R</td><td>Stow elevator</td></tr>
@@ -226,7 +227,8 @@
             <tr><td>Left stick</td><td>Drive</td></tr>
             <tr><td>Right stick</td><td>Rotate</td></tr>
             <tr><td>RT</td><td>Intake</td></tr>
-            <tr><td>LT</td><td>Eject</td></tr>
+            <tr><td>LT (hold)</td><td>Auto-align</td></tr>
+            <tr><td>D-pad down</td><td>Eject</td></tr>
             <tr><td>RB</td><td>Score</td></tr>
             <tr><td>A / B / Y</td><td>LEVEL 1 / 2 / 3</td></tr>
             <tr><td>X</td><td>OVEN</td></tr>
@@ -240,8 +242,8 @@
       <h4>How to score</h4>
       <ol class="small">
         <li>Grab CARROTS off the carpet with the intake, or park under your DEPOT chute in your FARM (far end) — the human player drops carrots straight into your robot.</li>
-        <li>PANTRY (your kitchen, scoring-table wall): face the shelves, raise to L1/L2/L3 and hold <b>F</b>.</li>
-        <li>OVEN (under your ramp): elevator low, face a side mouth or the tag face, hold <b>F</b>. Every 3 oven carrots are traded for a CARROT CAKE that rolls down your ramp.</li>
+        <li>PANTRY (your kitchen, scoring-table wall): raise to L1/L2/L3, hold <b>Space</b> to auto-align (slide left/right to pick a slot) and press <b>F</b>.</li>
+        <li>OVEN (under your ramp): elevator low, hold <b>Space</b> to auto-align to the nearest mouth and press <b>F</b>. Every 3 oven carrots are traded for a CARROT CAKE that rolls down your ramp.</li>
         <li>ENDGAME (last 20 s): get your bumpers into your TABLE ZONE at the DINNER TABLE and keep up to 3 pieces aboard for HARVEST HAUL points.</li>
       </ol>
     </template>
