@@ -32,7 +32,12 @@ test('a full 6-bot match runs to completion with sane scores', () => {
   assert.ok(res && res.red && res.blue);
   console.log('red', JSON.stringify(m.score.red.totals), 'blue', JSON.stringify(m.score.blue.totals));
   console.log('rp', JSON.stringify(res), 'sim ms', ms);
-  assert.ok(m.score.red.totals.pantry > 0 || m.score.blue.totals.pantry > 0, 'bots scored in a pantry');
+  assert.ok(m.score.red.totals.oven > 0 && m.score.blue.totals.oven > 0, 'bots scored carrots in the oven');
+  for (const a of ['red', 'blue'])
+    assert.ok(
+      m.score[a].pantry.every((l) => l.carrot === 0),
+      'bots only shelve carrot cakes',
+    );
   assert.ok(m.score.red.taxi + m.score.blue.taxi >= 4, 'most bots taxied');
 });
 
@@ -55,6 +60,15 @@ test('pantry scoring needs the right elevator height and facing', () => {
   for (let i = 0; i < 30; i++) m.step();
   assert.equal(m.score.red.pantry[2].carrot, 1);
   assert.equal(m.score.red.totals.pantry, 5);
+});
+
+test('shelf has no grid: pieces land where the robot is, and overlaps are refused', async () => {
+  const { shelfFit } = await import('../shared/sim.js');
+  assert.equal(shelfFit([], 6.0, 'red', 0.12), 6.0);
+  assert.equal(shelfFit([6.0], 6.1, 'red', 0.12), null, 'overlapping spot refused');
+  assert.ok(Math.abs(shelfFit([6.0], 6.4, 'red', 0.12) - (6.0 + F.PIECE.length)) < 1e-3, 'nudged against the neighbor');
+  const full = [0, 1, 2, 3, 4].map((i) => F.PANTRY.x0 + F.PIECE.length * (i + 0.5) + 0.001 * i);
+  assert.equal(shelfFit(full, 6.5, 'red'), null, 'five rollers fill a shelf');
 });
 
 test('oven carrots recirculate into a cake on the ramp', () => {

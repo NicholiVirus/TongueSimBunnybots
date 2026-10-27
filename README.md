@@ -31,14 +31,15 @@ npm start          # http://localhost:3000
 
 Driving is field-oriented **from your camera's point of view** (driver station = like the real alliance wall).
 
-**Auto-align:** hold Space near your PANTRY and the robot locks its heading and distance to the shelves — you can only slide left/right (it snaps to slot centers), then press F. Near your OVEN it drives itself onto the closest mouth. When a robot carries both, cakes go to the pantry first and carrots to the oven first.
+**Auto-align:** hold Space near your PANTRY and the robot locks its heading and distance to the shelves — you can only slide left/right, then press F. Shelves have no grid: the piece lands right where your robot is, as long as it doesn't overlap another (a small nudge against a neighbor is allowed). Near your OVEN it drives itself onto the closest mouth. When a robot carries both, cakes go to the pantry first and carrots to the oven first.
 
 ## The game (as implemented)
 
 Rules come from the Blair Bunnybots 2026 Game Manual v1.2; field geometry comes from the official field CAD (tape lines, PANTRY shelf heights, OVEN/RAMP, DEPOT chutes, DINNER TABLE) and the manual's AprilTag table.
 
+- **Bots** shelve only CARROT CAKES (worth the same in AUTO and TELEOP) and send carrots to the OVEN to bake more.
 - **Match:** 3 s countdown → 15 s AUTO → 2:15 TELEOP (last 20 s = ENDGAME) → PARK judged 3 s after the buzzer.
-- **PANTRY** (your KITCHEN, scoring-table wall): 3 shelves × 5 slots. Carrot 3/4/5, cake 8/10/12. Only your own pantry (G16).
+- **PANTRY** (your KITCHEN, scoring-table wall): 3 shelves, no slots — pieces sit wherever they fit, 5 rollers fill a shelf. Carrot 3/4/5, cake 8/10/12. Only your own pantry (G16).
 - **OVEN** (under your RAMP): carrot 2, cake 1. Every 3 oven carrots are traded at the opposing DEPOT for one of your 9 CARROT CAKES (the carrots go to the opponent's depot), and the cake rolls down your RAMP into the NEUTRAL ZONE. Oven-scored cakes come back down the ramp too.
 - **DEPOT** (your FARM, opposite end — two chutes): park under a chute and the human player drops a carrot into your robot. 24 carrots per alliance: 5 prestaged, 2 preloaded per robot, the rest at the depot.
 - **TAXI** 2, **PARK** in your TABLE ZONE 2, **HARVEST HAUL** +1 per carrot / +3 per cake held while parked (max 3).

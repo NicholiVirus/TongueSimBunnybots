@@ -186,28 +186,37 @@ export function assistInput(r, inp, alliance) {
   const toCmd = (err, gain) => clamp((err * gain) / c.maxSpeed, -1, 1);
   const out = { ...inp, rot: clamp((wrap(t.th - r.th) * 4) / c.maxOmega, -1, 1) };
   if (t.kind === 'pantry') {
-    const lateral = inp.mx || 0;
-    if (Math.abs(lateral) > 0.05) out.mx = lateral * 0.6;
-    else {
-      // detent onto the nearest slot center
-      const s = F.sideSign(alliance);
-      let sx = t.x;
-      let bd = Infinity;
-      for (let i = 0; i < F.PANTRY.slots; i++) {
-        const x = F.pantrySlotX(i, s);
-        if (Math.abs(x - r.x) < bd) {
-          bd = Math.abs(x - r.x);
-          sx = x;
-        }
-      }
-      out.mx = toCmd(sx - r.x, 3.5);
-    }
+    // no grid on the shelf: the driver slides freely and places wherever there's room
+    out.mx = clamp(inp.mx || 0, -1, 1) * 0.6;
     out.my = toCmd(t.y - r.y, 3.5);
   } else {
     out.mx = toCmd(t.x - r.x, 3.5);
     out.my = toCmd(t.y - r.y, 3.5);
   }
   return out;
+}
+
+// PANTRY shelves have no slots: a piece fits anywhere it doesn't overlap another (5 fit across).
+// Returns the closest valid center to `wantX` within `tol`, or null.
+export function shelfFit(xs, wantX, alliance, tol = Infinity) {
+  const pb = F.pantryBox(alliance);
+  const L = PIECE.length;
+  const lo = pb.x0 + L / 2;
+  const hi = pb.x1 - L / 2;
+  const cands = [clamp(wantX, lo, hi)];
+  for (const o of xs) cands.push(o + L + 1e-4, o - L - 1e-4);
+  let best = null;
+  let bd = tol;
+  for (const c of cands) {
+    if (c < lo - 1e-6 || c > hi + 1e-6) continue;
+    if (xs.some((o) => Math.abs(o - c) < L - 1e-3)) continue;
+    const d = Math.abs(c - wantX);
+    if (d <= bd) {
+      bd = d;
+      best = c;
+    }
+  }
+  return best;
 }
 
 export function collideRobotStatic(r) {
@@ -319,7 +328,7 @@ export class Match {
     }
 
     this.pantry = {};
-    for (const a of F.ALLIANCES) this.pantry[a] = [0, 1, 2].map(() => new Array(F.PANTRY.slots).fill(0));
+    for (const a of F.ALLIANCES) this.pantry[a] = [[], [], []]; // piece ids per shelf
     this.score = { red: emptyBreakdown(), blue: emptyBreakdown() };
   }
 
@@ -485,25 +494,16 @@ export class Match {
       });
       if (level < 0) return this.denied(r, 'Raise the elevator to L1/L2/L3');
       const shelf = this.pantry[a][level];
-      let best = -1;
-      let bd = Infinity;
-      for (let i = 0; i < shelf.length; i++) {
-        if (shelf[i]) continue;
-        const d = Math.abs(F.pantrySlotX(i, F.sideSign(a)) - fx);
-        if (d < bd) {
-          bd = d;
-          best = i;
-        }
-      }
-      if (best < 0) return this.denied(r, `LEVEL ${level + 1} is full`);
-      if (bd > 0.7) return this.denied(r, 'Line up with an open slot');
+      const xs = this.shelfXs(a, level);
+      if (shelfFit(xs, fx, a) === null) return this.denied(r, `LEVEL ${level + 1} is full`);
+      const px = shelfFit(xs, fx, a, 0.12);
+      if (px === null) return this.denied(r, 'No room there — slide left/right to a gap');
       const p = this.popHeld(r, 'cake');
-      shelf[best] = p.id;
-      const to = { x: F.pantrySlotX(best, F.sideSign(a)), y: (F.PANTRY.yFront + F.PANTRY.yBack) / 2 + 0.005, z: F.PANTRY.shelfZ[level], th: 0 };
+      shelf.push(p.id);
+      const to = { x: px, y: (F.PANTRY.yFront + F.PANTRY.yBack) / 2 + 0.005, z: F.PANTRY.shelfZ[level], th: 0 };
       this.startPlace(p, r, to, 'pantry', 0.22);
       p.owner = a;
       p.level = level;
-      p.slot = best;
       const pts = F.POINTS.pantry[p.type][level];
       this.emit({ type: 'score', alliance: a, pts, label: `L${level + 1} ${p.type === 'cake' ? 'CAKE' : 'CARROT'}`, x: to.x, y: to.y, z: to.z, robot: r.id });
       r.lastScore = this.time;
@@ -553,6 +553,14 @@ export class Match {
 
   afterScore(r) {
     if (r.held.length === 0 && r.input.autoStow !== false) r.elevTarget = 'stow';
+  }
+
+  // final x of every piece on a shelf (including ones still sliding into place)
+  shelfXs(a, level) {
+    return this.pantry[a][level].map((id) => {
+      const p = this.pieces.find((q) => q.id === id);
+      return p.anim ? p.anim.to.x : p.x;
+    });
   }
 
   // The mechanism hands over the preferred piece type first (cakes to the pantry, carrots to the oven).

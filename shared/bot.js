@@ -1,7 +1,8 @@
 // Simple autonomous driver used to fill empty alliance slots.
-// Collect -> score (pantry, oven when full) -> park at the DINNER TABLE for ENDGAME.
+// Collect -> carrots to the OVEN, carrot cakes to the PANTRY -> park at the DINNER TABLE for ENDGAME.
 
 import * as F from './field.js';
+import { shelfFit } from './sim.js';
 
 const CELL = 0.2;
 const NX = Math.ceil((F.FIELD.halfL * 2) / CELL);
@@ -359,9 +360,9 @@ export class Bot {
       for (const p of m.pieces) {
         if (p.st !== 'floor' && p.st !== 'table') continue;
         if (p.st === 'table' && p.x * s < 0) continue;
-        if (auto && p.x * s < 0.6) continue;
+        if (auto && p.x * s < 0.3) continue;
         if (p.z > 0.05 && p.st === 'floor') continue;
-        if (nearZone(p.x, p.y, [oppK, oppF], r.cfg.length)) continue;
+        if (nearZone(p.x, p.y, [oppK, oppF], r.cfg.length * 1.6)) continue;
         if (Math.abs(p.x) > F.FIELD.halfL - 0.4 || Math.abs(p.y) > F.FIELD.halfW - 0.4) continue;
         if (nearElement(p.x, p.y)) continue;
         if (this.claimedByAlly(m, r, p.id)) continue;
@@ -377,28 +378,34 @@ export class Bot {
       const depotT = m.inv[a].depotCarrots > 0 && !auto && m.timeLeft > F.TIMING.endgame + 10 ? this.depotTask(m, r) : null;
       const depotD = depotT ? Math.hypot(depotT.goal[0] - r.x, depotT.goal[1] - r.y) : Infinity;
       if (best && bd < depotD + 1.5) {
-        // approach so the roller lines up with the piece axis (two possible sides)
+        // approach so the roller lines up with the piece axis — pick the side that keeps us out of opponent zones
         const nx = -Math.sin(best.th);
         const ny = Math.cos(best.th);
-        const side = (r.x - best.x) * nx + (r.y - best.y) * ny >= 0 ? 1 : -1;
-        const hx = best.st === 'table' ? s : -side * nx;
-        const hy = best.st === 'table' ? 0 : -side * ny;
-        const heading = Math.atan2(hy, hx);
-        let gx = best.x - hx * (half + 0.12);
-        let gy = best.y - hy * (half + 0.12);
-        if (best.st === 'table') {
-          gx = s * (F.TABLE.baseHalfDiag + half + 0.03);
-          gy = 0;
+        const near = (best.x - r.x) * nx + (best.y - r.y) * ny <= 0 ? 1 : -1;
+        let plan = null;
+        for (const side of [near, -near]) {
+          const hx = best.st === 'table' ? s : side * nx;
+          const hy = best.st === 'table' ? 0 : side * ny;
+          let gx = best.x - hx * (half + 0.12);
+          let gy = best.y - hy * (half + 0.12);
+          if (best.st === 'table') {
+            gx = s * (F.TABLE.baseHalfDiag + half + 0.03);
+            gy = 0;
+          }
+          const stage = [gx - hx * 0.55, gy - hy * 0.55];
+          if (nearZone(gx, gy, [oppK, oppF], half + 0.1) || nearZone(stage[0], stage[1], [oppK, oppF], half + 0.1)) continue;
+          plan = {
+            kind: best.st === 'table' ? 'table' : 'collect',
+            pieceId: best.id,
+            goal: [gx, gy],
+            stage,
+            direct: true,
+            heading: best.st === 'table' ? (s > 0 ? Math.PI : 0) : Math.atan2(hy, hx),
+            since: m.time,
+          };
+          break;
         }
-        return {
-          kind: best.st === 'table' ? 'table' : 'collect',
-          pieceId: best.id,
-          goal: [gx, gy],
-          stage: [gx - hx * 0.55, gy - hy * 0.55],
-          direct: true,
-          heading: best.st === 'table' ? (s > 0 ? Math.PI : 0) : heading,
-          since: m.time,
-        };
+        if (plan) return plan;
       }
       if (depotT) return depotT;
     }
@@ -413,11 +420,11 @@ export class Bot {
     const s = F.sideSign(r.alliance);
     if (p.st === 'table' && p.x * s < 0) return false;
     if (p.st === 'floor' && p.z > 0.05) return false;
-    if (m.phase === 'auto' && p.x * s < 0.6) return false;
-    if (nearZone(p.x, p.y, [F.kitchenPoly(F.opponent(r.alliance)), F.farmPoly(F.opponent(r.alliance))], r.cfg.length)) return false;
+    if (m.phase === 'auto' && p.x * s < 0.3) return false;
+    if (nearZone(p.x, p.y, [F.kitchenPoly(F.opponent(r.alliance)), F.farmPoly(F.opponent(r.alliance))], r.cfg.length * 1.6)) return false;
     if (nearElement(p.x, p.y) && p.st !== 'table') return false;
     if (this.claimedByAlly(m, r, p.id)) return false;
-    if (!m.pantry[r.alliance].some((lvl) => lvl.some((id) => !id))) return false;
+    if (![0, 1, 2].some((l) => shelfFit(m.shelfXs(r.alliance, l), 0, r.alliance) !== null)) return false;
     const v = r.cfg.maxSpeed * 0.55;
     const pantryX = s * (F.PANTRY.x0 + F.PANTRY.x1) * 0.5;
     const trip = Math.hypot(p.x - r.x, p.y - r.y) / v + Math.hypot(pantryX - p.x, F.PANTRY.yFront - p.y) / v + 3;
@@ -457,23 +464,16 @@ export class Bot {
     const heldTop = { type: heldTypes.includes('cake') ? 'cake' : 'carrot' };
     const levels = [2, 1, 0].filter((l) => e.setpoints[['l1', 'l2', 'l3'][l]] <= e.max);
     const pantry = m.pantry[a];
-    const count = (l) => pantry[l].filter(Boolean).length;
-    const hasCake = (l) => pantry[l].some((id) => id && m.pieces.find((p) => p.id === id)?.type === 'cake');
-    // keep one slot per shelf free for a CARROT CAKE while cakes can still show up (Baked Up RP)
-    const inv = m.inv[a];
-    const cakesComing = m.timeLeft > 25 && (inv.cakeBank + inv.rampCakes > 0 || m.pieces.some((p) => p.type === 'cake' && (p.st === 'floor' || p.st === 'table' || p.st === 'ramp')));
-    const carrotCap = (l) => (!hasCake(l) && cakesComing ? 4 : 5);
+    const hasCake = (l) => pantry[l].some((id) => m.pieces.find((p) => p.id === id)?.type === 'cake');
+    // Shelves are for CARROT CAKES only (8-12 pts, same in AUTO and TELEOP); carrots go to the OVEN to bake more cakes.
+    const pb = F.pantryBox(a);
+    const prefer = pb.x0 + ((pb.x1 - pb.x0) * (r.station - 0.5)) / 3;
+    const fit = (l) => shelfFit(m.shelfXs(a, l), prefer, a);
     let level = -1;
-    if (heldTop?.type === 'cake') level = levels.find((l) => !hasCake(l) && count(l) < 5) ?? levels.find((l) => count(l) < 5) ?? -1;
-    else {
-      level = levels.find((l) => count(l) < 3) ?? -1; // stock every shelf to 3 first
-      if (level < 0) level = levels.find((l) => count(l) < carrotCap(l)) ?? -1;
-    }
+    if (heldTop.type === 'cake') level = levels.find((l) => !hasCake(l) && fit(l) !== null) ?? levels.find((l) => pantry[l].length < 3 && fit(l) !== null) ?? levels.find((l) => fit(l) !== null) ?? -1;
     const half = r.cfg.length / 2;
     if (level >= 0) {
-      const free = pantry[level].map((id, i) => (id ? null : i)).filter((i) => i !== null);
-      const slot = free[(r.station + level) % free.length];
-      const gx = F.pantrySlotX(slot, s);
+      const gx = fit(level);
       const gy = F.PANTRY.yFront - half - 0.01;
       return {
         kind: 'pantry',
@@ -488,7 +488,7 @@ export class Bot {
     }
     // pantry full and holding a cake: worth more as HARVEST HAUL (3) than in the oven (1)
     if (!heldTypes.includes('carrot')) return { ...this.parkSpot(r), kind: 'park', since: m.time };
-    // pantry full -> OVEN through the kitchen-side mouth
+    // carrots -> OVEN through the kitchen-side mouth
     const gx = s * ((F.OVEN.mouthX0 + F.OVEN.mouthX1) / 2 + 0.05);
     const gy = F.OVEN.y1 + half + 0.02;
     return { kind: 'oven', goal: [gx, gy], stage: [gx, gy + 0.6], direct: true, heading: -Math.PI / 2, sp: 'oven', heldAtStart: r.held.length, since: m.time };

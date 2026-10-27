@@ -301,11 +301,6 @@ function buildPantry(a) {
     lbl.position.copy(V(X((P.x0 + P.x1) / 2), P.yFront - 0.003, z - 0.035));
     g.add(lbl);
   });
-  // slot ticks on L1..L3
-  for (let i = 1; i < P.slots; i++) {
-    const xx = X(P.x0 + ((P.x1 - P.x0) / P.slots) * i);
-    for (const z of P.shelfZ) g.add(fbox(xx - 0.005, xx + 0.005, P.yFront, P.yFront + 0.004, z - 0.069, z - 0.001, mat(0x6b4a24)));
-  }
   return g;
 }
 
