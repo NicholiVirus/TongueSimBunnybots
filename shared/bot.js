@@ -301,6 +301,12 @@ export class Bot {
     }
     if (t.kind === 'ramp') {
       inp.sp = 'stow';
+      // sit perfectly still at the foot of the ramp so the human player rolls cakes down
+      if (remaining < 0.12) {
+        inp.mx = 0;
+        inp.my = 0;
+        inp.rot = Math.abs(he) > 0.08 ? inp.rot : 0;
+      }
       if (r.held.length >= F.MAX_HELD || (m.inv[r.alliance].rampCakes <= 0 && !m.incoming(r))) t.done = true;
     }
     if (t.kind === 'depot') {
@@ -373,6 +379,21 @@ export class Bot {
     const parkDist = Math.hypot(parkSpot.goal[0] - r.x, parkSpot.goal[1] - r.y);
     if (m.phase === 'teleop' && m.timeLeft < parkDist / (r.cfg.maxSpeed * 0.5) + 7) return parkSpot;
 
+    const heldTypes = r.held.map((id) => m.pieces.find((p) => p.id === id)?.type);
+    // keep catching while stored cakes are still coming down
+    if (this.task?.kind === 'ramp' && !this.task.done && r.held.length < F.MAX_HELD && (m.inv[a].rampCakes > 0 || m.incoming(r))) return this.task;
+    // PRIORITY 1: cakes aboard go on the shelves
+    if (heldTypes.includes('cake')) {
+      const t = this.scoreTask(m, r);
+      if (t?.kind === 'pantry') return t.kind === this.task?.kind && !this.task.done ? this.task : t;
+    }
+    // PRIORITY 2: cakes stored at our ramp — dump carrots in the oven (right beside it), then wait to catch
+    const ramp = this.rampTask(m, r);
+    if (ramp) {
+      if (heldTypes.includes('carrot')) return this.task?.kind === 'oven' && !this.task.done ? this.task : this.scoreTask(m, r);
+      return ramp;
+    }
+
     // keep a task that is still valid (avoid dithering)
     if (this.task && !this.task.done && this.task.kind !== 'park' && m.time - this.task.since < 6) {
       if (this.task.kind === 'collect' && r.held.length < F.MAX_HELD) return this.task;
@@ -381,10 +402,7 @@ export class Bot {
       if (this.task.kind === 'ramp' && r.held.length < F.MAX_HELD) return this.task;
     }
 
-    // a reachable CARROT CAKE is worth a detour before scoring (8-12 on a shelf vs 3-5 for a carrot)
-    // stored cakes only roll down the RAMP when someone waits at the bottom — go catch them
-    const ramp = this.rampTask(m, r);
-    if (ramp) return ramp;
+    // PRIORITY 3: a reachable loose CARROT CAKE is worth a detour before scoring carrots
     const cakeAvailable = r.held.length < F.MAX_HELD && m.pieces.some((p) => p.type === 'cake' && this.cakeWorthChasing(m, r, p));
     const wantScore = r.held.length >= F.MAX_HELD || (r.held.length > 0 && !cakeAvailable && !this.nearbyPiece(m, r, 3.0));
     if (wantScore) {
@@ -482,7 +500,7 @@ export class Bot {
 
   rampTask(m, r) {
     const a = r.alliance;
-    if (r.held.length >= F.MAX_HELD || m.inv[a].rampCakes <= 0 || m.phase === 'auto') return null;
+    if (m.autoRamp || m.inv[a].rampCakes <= 0 || m.phase === 'auto') return null;
     if ((m.bots || []).some((b) => b !== this && b.task?.kind === 'ramp' && m.robotById(b.id)?.alliance === a)) return null;
     if (![0, 1, 2].some((l) => shelfFit(m.shelfXs(a, l), 0, a) !== null)) return null;
     const s = F.sideSign(a);

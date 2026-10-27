@@ -103,6 +103,7 @@ const actions = {
       allies: Number($('pr-allies').value),
       opps: Number($('pr-opps').value),
       skill: Number($('pr-skill').value),
+      autoRamp: $('pr-autoramp').checked,
     });
   },
   quick: () => online({ t: 'quick' }),
@@ -189,6 +190,8 @@ function applySettings() {
   $('minimap').classList.toggle('hidden', !settings.minimap);
 }
 applySettings();
+
+$('lobby-autoramp').addEventListener('change', (e) => net.send({ t: 'settings', autoRamp: e.target.checked }));
 
 input.onChat = () => {
   if (!app.session || app.session.local) return;
@@ -342,6 +345,9 @@ function renderLobby(room) {
       net.send({ t: 'robot', robot: sel.value });
     });
   }
+  const ar = $('lobby-autoramp');
+  ar.checked = !!room.settings?.autoRamp;
+  ar.disabled = !isHost;
   $('lobby-specs').textContent = room.spectators.length ? room.spectators.map((s) => s.name).join(', ') : '—';
 }
 

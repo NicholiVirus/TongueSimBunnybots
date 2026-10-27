@@ -79,7 +79,9 @@
           <label>Bot skill
             <select id="pr-skill"><option value="0.6">Rookie</option><option value="0.85" selected>Veteran</option><option value="1">Einstein</option></select>
           </label>
+          <label class="check"><input type="checkbox" id="pr-autoramp" /> Auto-roll cakes down the ramp</label>
         </div>
+        <p class="muted small">Off: cakes stay stored until a robot sits still at the bottom of its ramp for 3 s, then roll into it 1.5 s apart. On: they roll onto the field as soon as they're baked.</p>
         <div class="row end">
           <button class="btn ghost" data-action="back">Back</button>
           <button class="btn primary" data-action="practice-start">Start Match</button>
@@ -107,6 +109,7 @@
         <div class="lobby-foot">
           <div class="spectators"><span class="muted small">SPECTATORS</span> <span id="lobby-specs">—</span> <button class="btn tiny ghost" data-action="spectate">Spectate</button></div>
           <div class="row">
+            <label class="check"><input type="checkbox" id="lobby-autoramp" /> Auto-roll cakes</label>
             <button class="btn ghost host-only" data-action="fill-bots">Fill with bots</button>
             <button class="btn primary host-only" data-action="start">Start Match</button>
             <span class="muted small guest-only">Waiting for host to start…</span>
@@ -244,7 +247,7 @@
         <li>Grab CARROTS off the carpet with the intake, or park under your DEPOT chute in your FARM (far end) — the human player drops carrots straight into your robot.</li>
         <li>PANTRY (your kitchen, scoring-table wall): raise to L1/L2/L3, hold <b>Space</b> to auto-align (slide left/right to an open spot — no fixed slots) and press <b>F</b>.</li>
         <li>OVEN (under your ramp): elevator low, hold <b>Space</b> to auto-align to the nearest mouth and press <b>F</b>. Every 3 oven carrots are traded for a CARROT CAKE that the human player stores at your ramp.</li>
-        <li>CAKES: park at the bottom of your ramp (in front of the oven's tag face) and a stored cake rolls straight into your robot.</li>
+        <li>CAKES: sit still for 3 s at the bottom of your ramp (in front of the oven's tag face — Space auto-aligns there) and stored cakes roll into your robot 1.5 s apart, up to 3.</li>
         <li>ENDGAME (last 20 s): get your bumpers into your TABLE ZONE at the DINNER TABLE and keep up to 3 pieces aboard for HARVEST HAUL points.</li>
       </ol>
     </template>

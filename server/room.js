@@ -25,6 +25,7 @@ export class Room {
     this.bots = [];
     this.loop = null;
     this.lastResult = null;
+    this.settings = { autoRamp: false };
     this.createdAt = Date.now();
   }
 
@@ -109,6 +110,11 @@ export class Room {
         this.broadcastRoom();
         break;
       }
+      case 'settings':
+        if (!isHost || this.phase !== 'lobby') return;
+        this.settings.autoRamp = !!msg.autoRamp;
+        this.broadcastRoom();
+        break;
       case 'fillBots':
         if (!isHost || this.phase !== 'lobby') return;
         for (const s of SLOT_IDS) if (!this.slots[s]) this.slots[s] = { type: 'bot', robot: ['team', 'speedy', 'tank'][SLOT_IDS.indexOf(s) % 3] };
@@ -165,7 +171,7 @@ export class Room {
       }
     }
     if (!slots.length) return this.sendError(this.players.get(this.host), 'Take a slot or add bots first');
-    this.match = new Match({ slots });
+    this.match = new Match({ slots, autoRamp: this.settings.autoRamp });
     this.match.bots = this.bots;
     this.phase = 'match';
     for (const p of this.players.values()) this.sendStart(p);
@@ -256,6 +262,7 @@ export class Room {
       code: this.code,
       host: this.host,
       phase: this.phase,
+      settings: this.settings,
       isPublic: this.isPublic,
       slots,
       spectators: [...this.players.values()].filter((p) => !seated.has(p.id)).map((p) => ({ pid: p.id, name: p.name })),

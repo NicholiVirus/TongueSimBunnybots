@@ -25,9 +25,20 @@ test('cakes stay stored on the ramp until a robot waits at the bottom', () => {
   r.x = F.OVEN.x0 - r.cfg.length / 2 - 0.05;
   r.y = F.OVEN.yc;
   r.th = 0;
-  for (let i = 0; i < 60 * 5; i++) m.step();
+  for (let i = 0; i < 60 * 2.9; i++) m.step();
+  assert.equal(m.inv.red.rampCakes, 2, 'nothing rolls until the robot has waited 3 s');
+  for (let i = 0; i < 60 * 3.5; i++) m.step();
   assert.equal(m.inv.red.rampCakes, 0);
-  assert.equal(r.held.length, 2, 'both cakes rolled straight into the waiting robot');
+  assert.equal(r.held.length, 2, 'both cakes rolled straight into the waiting robot, 1.5 s apart');
+});
+
+test('auto-roll setting sends cakes down without a catcher', () => {
+  const m = new Match({ slots: [{ id: 'a', alliance: 'red', station: 1, robot: 'team' }], preload: 0, autoRamp: true });
+  while (m.phase === 'countdown') m.step();
+  m.inv.red.rampCakes = 2;
+  for (let i = 0; i < 60 * 4; i++) m.step();
+  assert.equal(m.inv.red.rampCakes, 0);
+  assert.equal(m.pieces.filter((p) => p.type === 'cake' && p.st === 'floor').length, 2);
 });
 
 function fullBotMatch() {

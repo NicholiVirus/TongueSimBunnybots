@@ -10,7 +10,7 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const lerpAngle = (a, b, t) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * t;
 
 function robotFromArr(e) {
-  return { id: e[0], x: e[1], y: e[2], th: e[3], elev: e[4], held: e[5], flags: e[6], vx: e[7], vy: e[8], w: e[9], ack: e[10], elevTarget: e[11] };
+  return { id: e[0], x: e[1], y: e[2], th: e[3], elev: e[4], held: e[5], flags: e[6], vx: e[7], vy: e[8], w: e[9], ack: e[10], elevTarget: e[11], rampWait: e[12] || 0 };
 }
 function pieceFromArr(e) {
   return { id: e[0], type: e[1] === 'k' ? 'cake' : 'carrot', st: e[2], x: e[3], y: e[4], z: e[5], th: e[6], roll: e[7] };
@@ -68,8 +68,8 @@ const toSimInput = (i) => ({ seq: i.seq, mx: i.mx, my: i.my, rot: i.rot, intake:
 
 // ------------------------------------------------------------------ offline
 export class LocalSession {
-  constructor({ alliance = 'red', station = 2, robot = 'team', name = 'You', team = '', allies = 2, opps = 3, skill = 0.85 }) {
-    this.opts = { alliance, station, robot, name, team, allies, opps, skill };
+  constructor({ alliance = 'red', station = 2, robot = 'team', name = 'You', team = '', allies = 2, opps = 3, skill = 0.85, autoRamp = false }) {
+    this.opts = { alliance, station, robot, name, team, allies, opps, skill, autoRamp };
     this.local = true;
     this.reset();
   }
@@ -83,7 +83,7 @@ export class LocalSession {
     allyStations.forEach((s, i) => slots.push({ id: `${alliance}${s}`, alliance, station: s, robot: pool[(i + 1) % 3], name: `Bot ${s}`, team: String(100 + s), bot: true }));
     [2, 1, 3].slice(0, opps).forEach((s, i) => slots.push({ id: `${other}${s}`, alliance: other, station: s, robot: pool[i % 3], name: `Bot ${s}`, team: String(900 + s), bot: true }));
     this.you = slots[0].id;
-    this.match = new Match({ slots });
+    this.match = new Match({ slots, autoRamp: this.opts.autoRamp });
     this.bots = slots.filter((s) => s.bot).map((s) => new Bot(s.id, { skill }));
     this.match.bots = this.bots;
     this.roster = this.match.roster();

@@ -161,6 +161,7 @@ export class Hud {
       `<span>CAM: ${ctx.camName}</span>`,
       `<span class="${me.flags & 2 ? 'on' : ''}">TAXI ${me.flags & 2 ? '✓' : '·'}</span>`,
       `<span class="${me.flags & 1 ? 'on' : ''}">INTAKE</span>`,
+      me.rampWait > 0 ? `<span class="on">RAMP ${me.rampWait >= 3 ? 'CATCHING' : `hold still ${(3 - me.rampWait).toFixed(1)}s`}</span>` : '',
     ].join('');
     this.setHTML('rs-tags', tags);
   }

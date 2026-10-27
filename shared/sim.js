@@ -12,6 +12,8 @@ const SUB = [-(PIECE.length / 2 - PR), 0, PIECE.length / 2 - PR]; // sub-circle 
 const PIECE_I = PIECE.length ** 2 / 12 + PR ** 2 / 4; // inertia / mass
 const GRAV = 9.81;
 const HOLD_SPACING = 0.16;
+export const RAMP_WAIT = 3; // s a robot must sit at the foot of the ramp before cakes roll
+export const RAMP_GAP = 1.5; // s between cakes rolling down
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
@@ -249,7 +251,8 @@ export class Match {
    * @param {object} opts
    * @param {Array<{id:string, alliance:'red'|'blue', station:number, robot:string, name?:string, team?:string, bot?:boolean}>} opts.slots
    */
-  constructor({ slots, preload = F.PRELOAD_PER_ROBOT } = {}) {
+  constructor({ slots, preload = F.PRELOAD_PER_ROBOT, autoRamp = false } = {}) {
+    this.autoRamp = autoRamp; // true: cakes roll down as soon as they're ready, caught or not
     this.time = 0; // seconds since the match was created
     this.phase = 'countdown';
     this.phaseTime = 0;
@@ -938,17 +941,23 @@ export class Match {
         }
       } else inv.tradeTimer = 0;
 
-      // RAMP: the human player stores cakes and only rolls one down when an alliance
-      // robot is waiting at the bottom of the ramp with room for it
+      // RAMP: the human player stores cakes. Once an alliance robot has sat still at the
+      // bottom of the ramp for RAMP_WAIT s, cakes roll down into it every RAMP_GAP s until
+      // it's full. With autoRamp on, cakes roll down as soon as they're ready.
       inv.rampTimer = Math.max(0, inv.rampTimer - dt);
-      const catcher = live && inv.rampCakes > 0 && inv.rampTimer <= 0 && this.robots.find((q) => q.alliance === a && q.held.length + this.incoming(q) < F.MAX_HELD && this.inRampCatch(q));
-      if (catcher) {
+      for (const q of this.robots) {
+        if (q.alliance !== a) continue;
+        const still = Math.hypot(q.vx, q.vy) < 0.3 && Math.abs(q.w) < 0.6;
+        q.rampWait = live && still && this.inRampCatch(q) ? (q.rampWait || 0) + dt : 0;
+      }
+      const catcher = this.robots.find((q) => q.alliance === a && q.rampWait >= RAMP_WAIT && q.held.length + this.incoming(q) < F.MAX_HELD);
+      if (live && inv.rampCakes > 0 && inv.rampTimer <= 0 && (catcher || this.autoRamp)) {
         inv.rampCakes--;
-        inv.rampTimer = 1.6;
+        inv.rampTimer = RAMP_GAP;
         const s = F.sideSign(a);
         const p = this.addPiece('cake', s * (F.FIELD.halfL - 0.15), F.OVEN.yc, Math.PI / 2, 'ramp');
         p.z = F.OVEN.rampHigh;
-        p.anim = { fx: p.x, fy: p.y, fz: p.z, fth: p.th, to: { x: s * F.OVEN.frontX, z: F.OVEN.rampLow }, t: 0, dur: 1.0, robot: catcher.id };
+        p.anim = { fx: p.x, fy: p.y, fz: p.z, fth: p.th, to: { x: s * F.OVEN.frontX, z: F.OVEN.rampLow }, t: 0, dur: 1.0, robot: catcher?.id };
         this.emit({ type: 'cake', alliance: a });
       }
     }
@@ -1087,7 +1096,21 @@ export class Match {
       pt: r2(this.phaseTime),
       tl: r2(this.timeLeft),
       eg: this.isEndgame,
-      r: this.robots.map((r) => [r.id, r3(r.x), r3(r.y), r3(r.th), r3(r.elev), held(r), (r.intake ? 1 : 0) | (r.taxi ? 2 : 0) | (r.parked ? 4 : 0), r3(r.vx), r3(r.vy), r3(r.w), r.ack, r.elevTarget]),
+      r: this.robots.map((r) => [
+        r.id,
+        r3(r.x),
+        r3(r.y),
+        r3(r.th),
+        r3(r.elev),
+        held(r),
+        (r.intake ? 1 : 0) | (r.taxi ? 2 : 0) | (r.parked ? 4 : 0),
+        r3(r.vx),
+        r3(r.vy),
+        r3(r.w),
+        r.ack,
+        r.elevTarget,
+        r2(r.rampWait || 0),
+      ]),
       p: this.pieces.filter((p) => p.st !== 'held' && p.st !== 'gone').map((p) => [p.id, p.type === 'cake' ? 'k' : 'c', p.st[0], r3(p.x), r3(p.y), r3(p.z), r3(p.th), r2(p.roll)]),
       s: { red: this.score.red, blue: this.score.blue },
       inv: {
