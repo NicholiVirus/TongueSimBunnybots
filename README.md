@@ -40,7 +40,7 @@ Rules come from the Blair Bunnybots 2026 Game Manual v1.2; field geometry comes 
 - **Bots** shelve only CARROT CAKES (worth the same in AUTO and TELEOP) and send carrots to the OVEN to bake more.
 - **Match:** 3 s countdown → 15 s AUTO → 2:15 TELEOP (last 20 s = ENDGAME) → PARK judged 3 s after the buzzer.
 - **PANTRY** (your KITCHEN, scoring-table wall): 3 shelves, no slots — pieces sit wherever they fit, 5 rollers fill a shelf. Carrot 3/4/5, cake 8/10/12. Only your own pantry (G16).
-- **OVEN** (under your RAMP): carrot 2, cake 1. Every 3 oven carrots are traded at the opposing DEPOT for one of your 9 CARROT CAKES (the carrots go to the opponent's depot), and the cake rolls down your RAMP into the NEUTRAL ZONE. Oven-scored cakes come back down the ramp too.
+- **OVEN** (under your RAMP): carrot 2, cake 1. Every 3 oven carrots are traded at the opposing DEPOT for one of your 9 CARROT CAKES (the carrots go to the opponent's depot), and the human player stores it at your RAMP. Stored cakes only roll down when one of your robots is waiting at the bottom of the ramp (in front of the oven's AprilTag face) with room — they drop straight into it. Oven-scored cakes are stored the same way. The HUD shows how many are waiting (`Ramp N🍰`).
 - **DEPOT** (your FARM, opposite end — two chutes): park under a chute and the human player drops a carrot into your robot. 24 carrots per alliance: 5 prestaged, 2 preloaded per robot, the rest at the depot.
 - **TAXI** 2, **PARK** in your TABLE ZONE 2, **HARVEST HAUL** +1 per carrot / +3 per cake held while parked (max 3).
 - **RPs:** Win 3 / Tie 1, Stocked Up (3+ on every shelf), Baked Up (a cake on every shelf), Dinner (10+ endgame points).

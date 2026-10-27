@@ -130,7 +130,10 @@ export class Hud {
     ].join('');
     this.setHTML(`rp-${a}`, pills);
     const inv = s.inv[a];
-    this.setHTML(`inv-${a}`, `<span>Depot <b>${inv[0]}</b>🥕</span><span>Cakes left <b>${inv[1]}</b></span><span>Oven <b>${inv[2]}</b>/3</span><span>Pantry <b>${shelf.join('/')}</b></span>`);
+    this.setHTML(
+      `inv-${a}`,
+      `<span>Depot <b>${inv[0]}</b>🥕</span><span>Cakes left <b>${inv[1]}</b></span><span>Ramp <b>${inv[3]}</b>🍰</span><span>Oven <b>${inv[2]}</b>/3</span><span>Pantry <b>${shelf.join('/')}</b></span>`,
+    );
   }
 
   updateRobot(view, ctx) {

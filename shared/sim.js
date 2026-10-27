@@ -722,6 +722,15 @@ export class Match {
         p.th = Math.atan2(c.dy, c.dx) + Math.PI / 2;
       }
     } else if (p.st === 'ramp') {
+      const r = an.robot && this.robotById(an.robot);
+      if (r && r.held.length < F.MAX_HELD && this.inRampCatch(r)) {
+        p.st = 'held';
+        p.holder = r.id;
+        p.anim = null;
+        r.held.push(p.id);
+        this.emit({ type: 'feed', robot: r.id, piece: 'cake' });
+        return;
+      }
       p.st = 'floor';
       const dir = Math.sign(an.to.x - an.fx);
       p.vx = dir * 1.7;
@@ -869,6 +878,13 @@ export class Match {
   }
 
   // ---------------------------------------------------------------- human players
+  // robot parked at the foot of its own RAMP (in the NEUTRAL ZONE, in front of the oven's tag face)
+  inRampCatch(r) {
+    const s = F.sideSign(r.alliance);
+    const tx = s * (F.OVEN.x0 - r.cfg.length / 2 - 0.05);
+    return Math.abs(r.x - tx) < 0.4 && Math.abs(r.y - F.OVEN.yc) < 0.35;
+  }
+
   inCatchZone(r, chute) {
     // robot's bumper must be right under the 23" depot ramp mouth
     const off = r.cfg.length / 2 + 0.05;
@@ -922,15 +938,17 @@ export class Match {
         }
       } else inv.tradeTimer = 0;
 
-      // RAMP: roll cakes down into the NEUTRAL ZONE
+      // RAMP: the human player stores cakes and only rolls one down when an alliance
+      // robot is waiting at the bottom of the ramp with room for it
       inv.rampTimer = Math.max(0, inv.rampTimer - dt);
-      if (live && inv.rampCakes > 0 && inv.rampTimer <= 0) {
+      const catcher = live && inv.rampCakes > 0 && inv.rampTimer <= 0 && this.robots.find((q) => q.alliance === a && q.held.length + this.incoming(q) < F.MAX_HELD && this.inRampCatch(q));
+      if (catcher) {
         inv.rampCakes--;
         inv.rampTimer = 1.6;
         const s = F.sideSign(a);
         const p = this.addPiece('cake', s * (F.FIELD.halfL - 0.15), F.OVEN.yc, Math.PI / 2, 'ramp');
         p.z = F.OVEN.rampHigh;
-        p.anim = { fx: p.x, fy: p.y, fz: p.z, fth: p.th, to: { x: s * F.OVEN.frontX, z: F.OVEN.rampLow }, t: 0, dur: 1.0 };
+        p.anim = { fx: p.x, fy: p.y, fz: p.z, fth: p.th, to: { x: s * F.OVEN.frontX, z: F.OVEN.rampLow }, t: 0, dur: 1.0, robot: catcher.id };
         this.emit({ type: 'cake', alliance: a });
       }
     }
@@ -938,7 +956,7 @@ export class Match {
 
   incoming(r) {
     let n = 0;
-    for (const p of this.pieces) if (p.st === 'chute' && p.anim && p.anim.robot === r.id) n++;
+    for (const p of this.pieces) if ((p.st === 'chute' || p.st === 'ramp') && p.anim && p.anim.robot === r.id) n++;
     return n;
   }
 

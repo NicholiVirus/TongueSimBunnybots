@@ -14,6 +14,22 @@ test('bots grab their table cake during AUTO', () => {
   for (const c of tableCakes) assert.notEqual(c.st, 'table', `cake at x=${c.x.toFixed(2)} still on the table after AUTO`);
 });
 
+test('cakes stay stored on the ramp until a robot waits at the bottom', () => {
+  const m = new Match({ slots: [{ id: 'a', alliance: 'red', station: 1, robot: 'team' }], preload: 0 });
+  const r = m.robots[0];
+  while (m.phase === 'countdown') m.step();
+  m.inv.red.rampCakes = 2;
+  for (let i = 0; i < 60 * 4; i++) m.step();
+  assert.equal(m.inv.red.rampCakes, 2, 'nobody waiting: cakes stay with the human player');
+  assert.equal(m.pieces.filter((p) => p.type === 'cake' && p.st !== 'table').length, 0);
+  r.x = F.OVEN.x0 - r.cfg.length / 2 - 0.05;
+  r.y = F.OVEN.yc;
+  r.th = 0;
+  for (let i = 0; i < 60 * 5; i++) m.step();
+  assert.equal(m.inv.red.rampCakes, 0);
+  assert.equal(r.held.length, 2, 'both cakes rolled straight into the waiting robot');
+});
+
 function fullBotMatch() {
   const slots = [];
   for (const alliance of ['red', 'blue']) for (const station of [1, 2, 3]) slots.push({ id: `${alliance}${station}`, alliance, station, robot: ['team', 'speedy', 'tank'][station - 1], bot: true });

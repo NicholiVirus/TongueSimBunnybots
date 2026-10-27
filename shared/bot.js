@@ -299,6 +299,10 @@ export class Bot {
         if (!p || (p.st !== 'floor' && p.st !== 'table')) t.done = true;
       }
     }
+    if (t.kind === 'ramp') {
+      inp.sp = 'stow';
+      if (r.held.length >= F.MAX_HELD || (m.inv[r.alliance].rampCakes <= 0 && !m.incoming(r))) t.done = true;
+    }
     if (t.kind === 'depot') {
       inp.sp = 'stow';
       if (r.held.length >= F.MAX_HELD || m.inv[r.alliance].depotCarrots <= 0) t.done = true;
@@ -374,9 +378,13 @@ export class Bot {
       if (this.task.kind === 'collect' && r.held.length < F.MAX_HELD) return this.task;
       if ((this.task.kind === 'pantry' || this.task.kind === 'oven') && r.held.length) return this.task;
       if (this.task.kind === 'depot' && r.held.length < F.MAX_HELD) return this.task;
+      if (this.task.kind === 'ramp' && r.held.length < F.MAX_HELD) return this.task;
     }
 
     // a reachable CARROT CAKE is worth a detour before scoring (8-12 on a shelf vs 3-5 for a carrot)
+    // stored cakes only roll down the RAMP when someone waits at the bottom — go catch them
+    const ramp = this.rampTask(m, r);
+    if (ramp) return ramp;
     const cakeAvailable = r.held.length < F.MAX_HELD && m.pieces.some((p) => p.type === 'cake' && this.cakeWorthChasing(m, r, p));
     const wantScore = r.held.length >= F.MAX_HELD || (r.held.length > 0 && !cakeAvailable && !this.nearbyPiece(m, r, 3.0));
     if (wantScore) {
@@ -470,6 +478,18 @@ export class Bot {
 
   claimedByAlly(m, r, pid) {
     return (m.bots || []).some((b) => b !== this && b.task && b.task.pieceId === pid && m.robotById(b.id)?.alliance === r.alliance);
+  }
+
+  rampTask(m, r) {
+    const a = r.alliance;
+    if (r.held.length >= F.MAX_HELD || m.inv[a].rampCakes <= 0 || m.phase === 'auto') return null;
+    if ((m.bots || []).some((b) => b !== this && b.task?.kind === 'ramp' && m.robotById(b.id)?.alliance === a)) return null;
+    if (![0, 1, 2].some((l) => shelfFit(m.shelfXs(a, l), 0, a) !== null)) return null;
+    const s = F.sideSign(a);
+    const gx = s * (F.OVEN.x0 - r.cfg.length / 2 - 0.05);
+    const v = r.cfg.maxSpeed * 0.55;
+    if (m.timeLeft - Math.hypot(gx - r.x, F.OVEN.yc - r.y) / v - 8 < F.TIMING.endgame * 0.6) return null;
+    return { kind: 'ramp', goal: [gx, F.OVEN.yc], stage: [gx - s * 0.6, F.OVEN.yc], direct: true, heading: s > 0 ? 0 : Math.PI, since: m.time };
   }
 
   depotTask(m, r) {
