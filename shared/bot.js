@@ -46,7 +46,7 @@ function getGrid(rad, alliance) {
       const x = cx(i);
       const y = cy(j);
       if (inflatedBlocked(x, y, rad)) g[i * NY + j] = 0;
-      else g[i * NY + j] = F.pointInPoly(x, y, k) || F.pointInPoly(x, y, f) || F.pointInPoly(x, y, tz) ? 30 : 1;
+      else g[i * NY + j] = nearZone(x, y, [k, f, tz], rad * 1.3 + 0.05) ? 0 : 1; // never plan through an opponent zone
     }
   }
   gridCache.set(key, g);
@@ -287,6 +287,7 @@ export class Bot {
       inp.mx = -Math.cos(r.th) * 0.6 - Math.sin(r.th) * 0.4 * this.backDir;
       inp.my = -Math.sin(r.th) * 0.6 + Math.cos(r.th) * 0.4 * this.backDir;
     }
+    this.keepOutOfOpponentZones(r, inp);
 
     // task actions
     if (t.sp && remaining < 1.6) inp.sp = t.sp;
@@ -323,6 +324,38 @@ export class Bot {
       }
     }
     m.setInput(this.id, inp);
+  }
+
+  // Final safety net on every command: never drive toward an opponent KITCHEN, FARM or TABLE ZONE.
+  // Picks the allowed heading closest to the requested one (or the way out if we got shoved in).
+  keepOutOfOpponentZones(r, inp) {
+    const sp = Math.hypot(inp.mx, inp.my);
+    if (sp < 1e-3) return;
+    const opp = F.opponent(r.alliance);
+    const zones = [F.kitchenPoly(opp), F.farmPoly(opp), F.tableZonePoly(opp)];
+    const body = Math.hypot(r.cfg.length, r.cfg.width) / 2 + 0.06; // corners reach out when turned
+    const look = 0.3 + Math.hypot(r.vx, r.vy) * 0.35;
+    const blocked = (dx, dy) => nearZone(r.x + dx * look, r.y + dy * look, zones, body);
+    const ux = inp.mx / sp;
+    const uy = inp.my / sp;
+    if (!blocked(ux, uy)) return;
+    let best = null;
+    let bd = -Infinity;
+    for (let k = 0; k < 24; k++) {
+      const a = (k / 24) * Math.PI * 2;
+      const cx = Math.cos(a);
+      const cy = Math.sin(a);
+      if (blocked(cx, cy)) continue;
+      const dot = cx * ux + cy * uy;
+      if (dot > bd) {
+        bd = dot;
+        best = [cx, cy];
+      }
+    }
+    if (!best) return;
+    const k = bd > 0 ? sp * bd : sp * 0.5; // slow down when sliding along a zone edge
+    inp.mx = best[0] * k;
+    inp.my = best[1] * k;
   }
 
   chooseTask(m, r) {
@@ -524,6 +557,10 @@ function nearZone(x, y, zones, margin) {
       [-margin, 0],
       [0, margin],
       [0, -margin],
+      [margin * 0.7, margin * 0.7],
+      [margin * 0.7, -margin * 0.7],
+      [-margin * 0.7, margin * 0.7],
+      [-margin * 0.7, -margin * 0.7],
     ]) {
       if (F.pointInPoly(x + dx, y + dy, z)) return true;
     }
