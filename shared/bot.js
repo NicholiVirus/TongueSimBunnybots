@@ -475,6 +475,8 @@ export class Bot {
 
   // Only chase a cake if there's a free shelf slot and time to get it there before ENDGAME parking.
   cakeWorthChasing(m, r, p) {
+    // AUTO: exactly one bot per alliance rushes the table cake; partners work carrots into the oven
+    if (m.phase === 'auto' && autoRusher(m, r.alliance) !== r.id) return false;
     if (p.st !== 'floor' && p.st !== 'table') return false;
     const s = F.sideSign(r.alliance);
     if (p.st === 'table' && p.x * s < 0) return false;
@@ -585,6 +587,20 @@ export class Bot {
     const gy = sp.e[1] + sp.n[1] * (half + 0.06);
     return { kind: 'park', goal: [gx, gy], heading: Math.atan2(-sp.n[1], -s * sp.n[0]), since: 0 };
   }
+}
+
+// The bot closest to its alliance's table cake when AUTO starts is the one that rushes it.
+function autoRusher(m, a) {
+  m.autoRushers ??= {};
+  if (m.autoRushers[a] === undefined) {
+    const s = F.sideSign(a);
+    const cake = { x: s * F.TABLE_CAKE_SPOT.x, y: F.TABLE_CAKE_SPOT.y };
+    const ids = new Set((m.bots || []).map((b) => b.id));
+    const mine = m.robots.filter((q) => q.alliance === a && ids.has(q.id));
+    mine.sort((p, q) => Math.hypot(p.x - cake.x, p.y - cake.y) - Math.hypot(q.x - cake.x, q.y - cake.y));
+    m.autoRushers[a] = mine[0]?.id ?? null;
+  }
+  return m.autoRushers[a];
 }
 
 // opponent robot sitting in one of its protected zones (KITCHEN, FARM, TABLE ZONE)

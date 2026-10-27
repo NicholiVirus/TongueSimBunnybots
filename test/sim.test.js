@@ -41,6 +41,21 @@ test('auto-roll setting sends cakes down without a catcher', () => {
   assert.equal(m.pieces.filter((p) => p.type === 'cake' && p.st === 'floor').length, 2);
 });
 
+test('in AUTO one bot per alliance rushes the table cake, partners feed the oven', () => {
+  const m = fullBotMatch();
+  const rushers = { red: new Set(), blue: new Set() };
+  while (m.phase !== 'teleop') {
+    for (const b of m.bots) {
+      b.update(m, TICK);
+      if (b.task?.kind === 'table') rushers[m.robotById(b.id).alliance].add(b.id);
+    }
+    m.step(TICK);
+  }
+  assert.equal(rushers.red.size, 1);
+  assert.equal(rushers.blue.size, 1);
+  assert.ok(m.score.red.ovenCarrot >= 3 && m.score.blue.ovenCarrot >= 3, 'partners put carrots in the oven during AUTO');
+});
+
 function fullBotMatch() {
   const slots = [];
   for (const alliance of ['red', 'blue']) for (const station of [1, 2, 3]) slots.push({ id: `${alliance}${station}`, alliance, station, robot: ['team', 'speedy', 'tank'][station - 1], bot: true });
