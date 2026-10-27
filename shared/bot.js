@@ -308,6 +308,10 @@ export class Bot {
         inp.rot = Math.abs(he) > 0.08 ? inp.rot : 0;
       }
       if (r.held.length >= F.MAX_HELD || (m.inv[r.alliance].rampCakes <= 0 && !m.incoming(r))) t.done = true;
+      // carrots aboard (all 3 slots should be free for cakes): leave and unload them in the oven first
+      if (r.held.some((id) => m.pieces.find((p) => p.id === id)?.type === 'carrot')) {
+        t.done = true;
+      }
     }
     if (t.kind === 'depot') {
       inp.sp = 'stow';
@@ -381,7 +385,7 @@ export class Bot {
 
     const heldTypes = r.held.map((id) => m.pieces.find((p) => p.id === id)?.type);
     // keep catching while stored cakes are still coming down
-    if (this.task?.kind === 'ramp' && !this.task.done && r.held.length < F.MAX_HELD && (m.inv[a].rampCakes > 0 || m.incoming(r))) return this.task;
+    if (this.task?.kind === 'ramp' && !this.task.done && r.held.length < F.MAX_HELD && !heldTypes.includes('carrot') && (m.inv[a].rampCakes > 0 || m.incoming(r))) return this.task;
     // PRIORITY 1: cakes aboard go on the shelves
     if (heldTypes.includes('cake')) {
       const t = this.scoreTask(m, r);
