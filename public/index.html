@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Harvest Havoc Sim</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M18 50 L44 16 L52 24 Z' fill='%23ff8a1f'/%3E%3Cpath d='M44 16 l6-10 M46 18 l12-4 M47 17 l8-8' stroke='%235ad16a' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" />
+    <link rel="stylesheet" href="/css/style.css" />
+    <script type="importmap">
+      { "imports": { "three": "/vendor/three/three.module.js", "three/addons/": "/vendor/three/addons/" } }
+    </script>
+  </head>
+  <body>
+    <canvas id="view"></canvas>
+
+    <!-- ============================== MAIN MENU -->
+    <section id="menu" class="screen">
+      <div class="menu-card">
+        <div class="brand">
+          <svg class="brand-icon" viewBox="0 0 64 64" aria-hidden="true">
+            <path d="M14 54 L42 18 L50 26 Z" fill="#ff8a1f" />
+            <path d="M20 46 l6 2 M27 37 l6 2 M34 28 l5 2" stroke="#c4540a" stroke-width="2.5" stroke-linecap="round" />
+            <path d="M43 17 l5-11 M46 21 l13-4 M46 19 l9-9" stroke="#5ad16a" stroke-width="4.5" stroke-linecap="round" />
+          </svg>
+          <div>
+            <div class="brand-kicker">Blair Bunnybots 2026</div>
+            <h1>HARVEST <span>HAVOC</span></h1>
+            <div class="brand-sub">Web multiplayer robot simulator</div>
+          </div>
+        </div>
+
+        <div class="profile">
+          <label>Driver name<input id="in-name" maxlength="20" placeholder="Driver" /></label>
+          <label>Team #<input id="in-team" maxlength="5" inputmode="numeric" placeholder="449" /></label>
+          <label class="wide">Robot<select id="in-robot"></select></label>
+          <p id="robot-blurb" class="muted small"></p>
+        </div>
+
+        <div class="menu-buttons">
+          <button class="btn primary big" data-action="practice">Practice <small>offline · vs bots</small></button>
+          <button class="btn big" data-action="quick">Quick Play <small>online</small></button>
+          <div class="row">
+            <button class="btn" data-action="create">Create Room</button>
+            <button class="btn ghost" data-action="create-private">Private Room</button>
+          </div>
+          <div class="row join">
+            <input id="in-code" maxlength="4" placeholder="CODE" autocomplete="off" />
+            <button class="btn" data-action="join">Join</button>
+          </div>
+          <div class="row">
+            <button class="btn ghost" data-action="controls">Controls</button>
+            <button class="btn ghost" data-action="settings">Settings</button>
+            <button class="btn ghost" data-action="rules">Game Rules</button>
+          </div>
+        </div>
+        <div id="net-status" class="muted small"></div>
+      </div>
+    </section>
+
+    <!-- ============================== PRACTICE SETUP -->
+    <section id="practice" class="screen hidden">
+      <div class="panel narrow">
+        <h2>Practice Match</h2>
+        <div class="form-grid">
+          <label>Alliance
+            <select id="pr-alliance"><option value="red">Red</option><option value="blue">Blue</option></select>
+          </label>
+          <label>Driver station
+            <select id="pr-station"><option>1</option><option selected>2</option><option>3</option></select>
+          </label>
+          <label>Alliance partners (bots)
+            <select id="pr-allies"><option>0</option><option>1</option><option selected>2</option></select>
+          </label>
+          <label>Opponents (bots)
+            <select id="pr-opps"><option>0</option><option>1</option><option>2</option><option selected>3</option></select>
+          </label>
+          <label>Bot skill
+            <select id="pr-skill"><option value="0.6">Rookie</option><option value="0.85" selected>Veteran</option><option value="1">Einstein</option></select>
+          </label>
+        </div>
+        <div class="row end">
+          <button class="btn ghost" data-action="back">Back</button>
+          <button class="btn primary" data-action="practice-start">Start Match</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================== LOBBY -->
+    <section id="lobby" class="screen hidden">
+      <div class="panel lobby-panel">
+        <div class="lobby-head">
+          <div>
+            <div class="muted small">ROOM CODE</div>
+            <div class="code" id="lobby-code">----</div>
+          </div>
+          <div class="lobby-actions">
+            <button class="btn ghost" data-action="copy-link">Copy invite link</button>
+            <button class="btn ghost" data-action="leave">Leave</button>
+          </div>
+        </div>
+        <div class="alliances">
+          <div class="alliance red"><h3>RED ALLIANCE</h3><div class="slots" data-alliance="red"></div></div>
+          <div class="alliance blue"><h3>BLUE ALLIANCE</h3><div class="slots" data-alliance="blue"></div></div>
+        </div>
+        <div class="lobby-foot">
+          <div class="spectators"><span class="muted small">SPECTATORS</span> <span id="lobby-specs">—</span> <button class="btn tiny ghost" data-action="spectate">Spectate</button></div>
+          <div class="row">
+            <button class="btn ghost host-only" data-action="fill-bots">Fill with bots</button>
+            <button class="btn primary host-only" data-action="start">Start Match</button>
+            <span class="muted small guest-only">Waiting for host to start…</span>
+          </div>
+        </div>
+        <div class="chat">
+          <div class="chat-log" id="chat-log"></div>
+          <input id="chat-in" maxlength="160" placeholder="Chat (Enter to send)" />
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================== IN-GAME HUD -->
+    <section id="hud" class="hidden">
+      <div class="scorebar">
+        <div class="sb-side red">
+          <div class="sb-rp" id="rp-red"></div>
+          <div class="sb-score" id="score-red">0</div>
+        </div>
+        <div class="sb-mid">
+          <div class="sb-phase" id="phase">AUTO</div>
+          <div class="sb-time" id="clock">2:30</div>
+        </div>
+        <div class="sb-side blue">
+          <div class="sb-score" id="score-blue">0</div>
+          <div class="sb-rp" id="rp-blue"></div>
+        </div>
+      </div>
+      <div class="sb-inv">
+        <div class="inv red" id="inv-red"></div>
+        <div class="inv blue" id="inv-blue"></div>
+      </div>
+      <div id="banner" class="banner"></div>
+      <div id="toasts" class="toasts"></div>
+      <div id="hint" class="hint"></div>
+      <canvas id="minimap" width="330" height="166"></canvas>
+      <div class="robot-status" id="robot-status">
+        <div class="rs-title" id="rs-title">—</div>
+        <div class="rs-held" id="rs-held"></div>
+        <div class="rs-elev" id="rs-elev"></div>
+        <div class="rs-tags" id="rs-tags"></div>
+      </div>
+      <div class="keys-hint" id="keys-hint">
+        <b>WASD</b> drive · <b>Q/E ←/→</b> turn · <b>Space</b> intake · <b>1/2/3</b> L1–L3 · <b>4</b> oven · <b>R</b> stow · <b>F</b> score · <b>G</b> eject · <b>C</b> camera · <b>V</b> field/robot · <b>Esc</b> menu
+      </div>
+      <div class="ingame-chat hidden" id="ingame-chat">
+        <div class="chat-log" id="chat-log2"></div>
+        <input id="chat-in2" maxlength="160" placeholder="Say something…" />
+      </div>
+    </section>
+
+    <!-- ============================== PAUSE -->
+    <section id="pause" class="screen hidden">
+      <div class="panel narrow center">
+        <h2>Paused</h2>
+        <p class="muted small" id="pause-note"></p>
+        <div class="col">
+          <button class="btn primary" data-action="resume">Resume</button>
+          <button class="btn" data-action="restart">Restart Match</button>
+          <button class="btn ghost" data-action="controls">Controls</button>
+          <button class="btn ghost" data-action="settings">Settings</button>
+          <button class="btn ghost" data-action="quit">Quit to Menu</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================== RESULTS -->
+    <section id="results" class="screen hidden">
+      <div class="panel results-panel">
+        <div class="res-banner" id="res-banner">RED WINS</div>
+        <div class="res-scores">
+          <div class="res-score red" id="res-red">0</div>
+          <div class="res-vs">FINAL</div>
+          <div class="res-score blue" id="res-blue">0</div>
+        </div>
+        <table class="breakdown" id="res-table"></table>
+        <div class="res-rp" id="res-rp"></div>
+        <div class="row end">
+          <button class="btn ghost" data-action="quit">Main Menu</button>
+          <button class="btn primary" data-action="again">Play Again</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================== MODALS -->
+    <section id="modal" class="screen hidden">
+      <div class="panel modal-panel">
+        <button class="close" data-action="close-modal" aria-label="Close">×</button>
+        <div id="modal-body"></div>
+      </div>
+    </section>
+
+    <template id="tpl-controls">
+      <h2>Controls</h2>
+      <div class="two-col">
+        <div>
+          <h4>Keyboard</h4>
+          <table class="keys">
+            <tr><td>W A S D</td><td>Drive (field-oriented from your camera)</td></tr>
+            <tr><td>Q / E · ← / →</td><td>Rotate</td></tr>
+            <tr><td>Space (hold)</td><td>Run intake</td></tr>
+            <tr><td>1 / 2 / 3</td><td>Elevator to PANTRY LEVEL 1 / 2 / 3</td></tr>
+            <tr><td>4</td><td>Elevator to OVEN</td></tr>
+            <tr><td>R</td><td>Stow elevator</td></tr>
+            <tr><td>F (hold)</td><td>Score / place game piece</td></tr>
+            <tr><td>G</td><td>Eject a game piece</td></tr>
+            <tr><td>C</td><td>Cycle camera</td></tr>
+            <tr><td>V</td><td>Toggle field / robot oriented</td></tr>
+            <tr><td>M</td><td>Toggle mini-map</td></tr>
+            <tr><td>T</td><td>Chat (online)</td></tr>
+            <tr><td>Esc</td><td>Pause / menu</td></tr>
+          </table>
+        </div>
+        <div>
+          <h4>Gamepad (Xbox layout)</h4>
+          <table class="keys">
+            <tr><td>Left stick</td><td>Drive</td></tr>
+            <tr><td>Right stick</td><td>Rotate</td></tr>
+            <tr><td>RT</td><td>Intake</td></tr>
+            <tr><td>LT</td><td>Eject</td></tr>
+            <tr><td>RB</td><td>Score</td></tr>
+            <tr><td>A / B / Y</td><td>LEVEL 1 / 2 / 3</td></tr>
+            <tr><td>X</td><td>OVEN</td></tr>
+            <tr><td>LB</td><td>Stow</td></tr>
+            <tr><td>View</td><td>Camera</td></tr>
+            <tr><td>L-stick click</td><td>Field / robot oriented</td></tr>
+            <tr><td>Menu</td><td>Pause</td></tr>
+          </table>
+        </div>
+      </div>
+      <h4>How to score</h4>
+      <ol class="small">
+        <li>Grab CARROTS off the carpet with the intake, or park under your DEPOT chute in your FARM (far end) — the human player drops carrots straight into your robot.</li>
+        <li>PANTRY (your kitchen, scoring-table wall): face the shelves, raise to L1/L2/L3 and hold <b>F</b>.</li>
+        <li>OVEN (under your ramp): elevator low, face a side mouth or the tag face, hold <b>F</b>. Every 3 oven carrots are traded for a CARROT CAKE that rolls down your ramp.</li>
+        <li>ENDGAME (last 20 s): get your bumpers into your TABLE ZONE at the DINNER TABLE and keep up to 3 pieces aboard for HARVEST HAUL points.</li>
+      </ol>
+    </template>
+
+    <template id="tpl-rules">
+      <h2>Harvest Havoc — scoring</h2>
+      <div class="two-col">
+        <table class="keys">
+          <tr><th></th><th>CARROT</th><th>CAKE</th></tr>
+          <tr><td>PANTRY LEVEL 3</td><td>5</td><td>12</td></tr>
+          <tr><td>PANTRY LEVEL 2</td><td>4</td><td>10</td></tr>
+          <tr><td>PANTRY LEVEL 1</td><td>3</td><td>8</td></tr>
+          <tr><td>OVEN</td><td>2</td><td>1</td></tr>
+          <tr><td>HARVEST HAUL (held while parked, max 3)</td><td>1</td><td>3</td></tr>
+        </table>
+        <table class="keys">
+          <tr><td>TAXI (fully leave KITCHEN in AUTO)</td><td>2</td></tr>
+          <tr><td>PARK (in TABLE ZONE at end)</td><td>2</td></tr>
+          <tr><td>MINOR / MAJOR FOUL (to opponent)</td><td>4 / 8</td></tr>
+          <tr><td>Win / Tie</td><td>3 / 1 RP</td></tr>
+          <tr><td>Stocked Up — 3+ pieces on every shelf</td><td>1 RP</td></tr>
+          <tr><td>Baked Up — a cake on every shelf</td><td>1 RP</td></tr>
+          <tr><td>Dinner — 10+ ENDGAME points</td><td>1 RP</td></tr>
+        </table>
+      </div>
+      <p class="small muted">Match: 15 s AUTO + 2:15 TELEOP (last 20 s = ENDGAME). 5 pieces per shelf, 3 pieces per robot (G14). Auto-called fouls: G11 contact in an opponent's KITCHEN/FARM, G12 TABLE ZONE protection in ENDGAME, G13 crossing the CENTER LINE in AUTO. Based on the Blair Bunnybots 2026 manual v1.2.</p>
+    </template>
+
+    <template id="tpl-settings">
+      <h2>Settings</h2>
+      <div class="form-grid">
+        <label>Default camera
+          <select data-setting="camera">
+            <option value="driver">Driver station</option>
+            <option value="chase">Chase</option>
+            <option value="top">Overhead</option>
+            <option value="broadcast">Broadcast</option>
+          </select>
+        </label>
+        <label>Graphics
+          <select data-setting="quality">
+            <option value="high">High (shadows)</option>
+            <option value="low">Low (fast)</option>
+          </select>
+        </label>
+        <label class="check"><input type="checkbox" data-setting="fieldOriented" /> Field-oriented drive</label>
+        <label class="check"><input type="checkbox" data-setting="autoStow" /> Auto-stow elevator when empty</label>
+        <label class="check"><input type="checkbox" data-setting="minimap" /> Show mini-map</label>
+        <label class="check"><input type="checkbox" data-setting="sound" /> Sound effects</label>
+      </div>
+    </template>
+
+    <script type="module" src="/js/main.js"></script>
+  </body>
+</html>
