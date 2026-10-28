@@ -115,7 +115,7 @@ export class Hud {
       for (const r of view.robots.values()) {
         const info = view.rosterById?.get(r.id);
         if (!info || info.alliance !== a) continue;
-        const cfg = getRobotConfig(info.robot);
+        const cfg = getRobotConfig(info.robot, info.mods);
         const poly = boxCorners({ cx: r.x, cy: r.y, hx: cfg.length / 2, hy: cfg.width / 2, th: r.th });
         if (!F.polysOverlap(poly, F.tableZonePoly(a))) continue;
         eg += F.POINTS.park;
@@ -142,7 +142,7 @@ export class Hud {
     box.classList.toggle('hidden', !me);
     if (!me) return;
     const info = view.rosterById.get(ctx.you);
-    const cfg = getRobotConfig(info.robot);
+    const cfg = getRobotConfig(info.robot, info.mods);
     this.setText('rs-title', `${info.team ? '#' + info.team + ' · ' : ''}${cfg.name}`);
     const held = me.held || '';
     let h = '';
@@ -161,6 +161,7 @@ export class Hud {
       `<span>CAM: ${ctx.camName}</span>`,
       `<span class="${me.flags & 2 ? 'on' : ''}">TAXI ${me.flags & 2 ? '✓' : '·'}</span>`,
       `<span class="${me.flags & 1 ? 'on' : ''}">INTAKE</span>`,
+      cfg.mods?.mech === 'separate' && held.length ? `<span class="${me.flags & 8 ? 'on' : ''}">CARRIAGE ${me.flags & 8 ? 'LOADED' : 'reloading — stow'}</span>` : '',
       me.rampWait > 0 ? `<span class="on">RAMP ${me.rampWait >= 3 ? 'CATCHING' : `hold still ${(3 - me.rampWait).toFixed(1)}s`}</span>` : '',
     ].join('');
     this.setHTML('rs-tags', tags);
@@ -226,7 +227,7 @@ export class Hud {
     for (const r of view.robots.values()) {
       const info = view.rosterById.get(r.id);
       if (!info) continue;
-      const cfg = getRobotConfig(info.robot);
+      const cfg = getRobotConfig(info.robot, info.mods);
       const pts = boxCorners({ cx: r.x, cy: r.y, hx: cfg.length / 2, hy: cfg.width / 2, th: r.th });
       poly(pts, info.alliance === 'red' ? '#ff5457' : '#4f8dff');
       const [hx, hy] = P(r.x + Math.cos(r.th) * cfg.length * 0.5, r.y + Math.sin(r.th) * cfg.length * 0.5);

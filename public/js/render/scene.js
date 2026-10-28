@@ -148,7 +148,7 @@ export class SceneView {
     this.alliance = me?.alliance || 'red';
     this.station = me?.station || 2;
     for (const info of roster) {
-      const rv = new RobotView(info, getRobotConfig(info.robot));
+      const rv = new RobotView(info, getRobotConfig(info.robot, info.mods));
       if (info.id === you) rv.label.visible = false;
       this.robots.set(info.id, rv);
       this.scene.add(rv.group);

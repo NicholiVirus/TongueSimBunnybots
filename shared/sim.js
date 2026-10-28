@@ -12,6 +12,7 @@ const SUB = [-(PIECE.length / 2 - PR), 0, PIECE.length / 2 - PR]; // sub-circle 
 const PIECE_I = PIECE.length ** 2 / 12 + PR ** 2 / 4; // inertia / mass
 const GRAV = 9.81;
 const HOLD_SPACING = 0.16;
+export const LOAD_TIME = 0.45; // s for a separate elevator to take a piece from the hopper
 export const RAMP_WAIT = 3; // s a robot must sit at the foot of the ramp before cakes roll
 export const RAMP_GAP = 0.5; // s between cakes rolling down
 
@@ -130,7 +131,8 @@ export function driveStep(r, inp, dt, enabled = true) {
   }
   // tall elevator = slower, gentler driving
   const e = c.elevator;
-  const tall = clamp((r.elev - e.min) / (e.max - e.min), 0, 1);
+  // a separate elevator lifts one piece; a passthrough lifts the whole load (more top-heavy)
+  const tall = clamp((r.elev - e.min) / Math.max(0.3, e.max - e.min), 0, 1) * (c.mods?.mech === 'separate' ? 0.5 : 1);
   const vmax = c.maxSpeed * (1 - 0.45 * tall);
   const acc = c.accel * (1 - 0.35 * tall) * (enabled ? 1 : 1.6);
   const tvx = mx * vmax;
@@ -266,7 +268,7 @@ export class Match {
     this.tick = 0;
 
     for (const s of slots) {
-      const cfg = getRobotConfig(s.robot);
+      const cfg = getRobotConfig(s.robot, s.mods);
       const p = F.startPose(s.alliance, s.station);
       this.robots.push({
         id: s.id,
@@ -416,7 +418,23 @@ export class Match {
     }
     const target = clamp(e.setpoints[r.elevTarget] ?? e.min, e.min, e.max);
     r.elev += clamp(target - r.elev, -e.speed * dt, e.speed * dt);
-    r.intake = en && !!inp.intake && r.held.length < F.MAX_HELD;
+    const mods = r.cfg.mods;
+    r.intake = en && !!inp.intake && r.held.length < F.MAX_HELD && mods.ground;
+    if (en && inp.intake && !mods.ground) this.denied(r, 'This robot has no ground intake — use the DEPOT or RAMP');
+
+    // separate hopper + elevator: the carriage carries one piece and reloads at the bottom
+    if (mods.mech === 'separate') {
+      r.carriage = Math.min(r.carriage || 0, r.held.length);
+      if (!r.carriage && r.held.length && r.elev <= e.min + 0.04) {
+        r.loadT = (r.loadT || 0) + dt;
+        if (r.loadT >= LOAD_TIME) {
+          r.carriage = 1;
+          r.loadT = 0;
+          if (r.returnTo && r.input.autoStow !== false) r.elevTarget = r.returnTo; // back up to the last shelf
+          r.returnTo = null;
+        }
+      } else r.loadT = 0;
+    }
 
     if (en && inp.align && !alignTarget(r, r.alliance)) this.denied(r, 'Nothing to align to — get near your PANTRY or OVEN');
     driveStep(r, assistInput(r, inp, r.alliance), dt, en);
@@ -492,10 +510,12 @@ export class Match {
     const facingPantry = fwdY > Math.cos((32 * Math.PI) / 180);
     if (facingPantry && fy > F.PANTRY.yFront - 0.22 && fx > pb.x0 + 0.05 && fx < pb.x1 - 0.05) {
       let level = -1;
+      // only score once the elevator has arrived at the shelf it was sent to (not while passing others)
       ['l1', 'l2', 'l3'].forEach((k, i) => {
-        if (Math.abs(r.elev - e.setpoints[k]) <= e.tolerance) level = i;
+        if (r.elevTarget === k && Math.abs(r.elev - e.setpoints[k]) <= e.tolerance) level = i;
       });
       if (level < 0) return this.denied(r, 'Raise the elevator to L1/L2/L3');
+      if (r.cfg.mods.mech === 'separate' && !r.carriage) return this.denied(r, 'Carriage empty — stow (R) to reload from the hopper');
       const shelf = this.pantry[a][level];
       const xs = this.shelfXs(a, level);
       if (shelfFit(xs, fx, a) === null) return this.denied(r, `LEVEL ${level + 1} is full`);
@@ -505,6 +525,13 @@ export class Match {
       shelf.push(p.id);
       const to = { x: px, y: (F.PANTRY.yFront + F.PANTRY.yBack) / 2 + 0.005, z: F.PANTRY.shelfZ[level], th: 0 };
       this.startPlace(p, r, to, 'pantry', 0.22);
+      if (r.cfg.mods.mech === 'separate') {
+        r.carriage = 0;
+        if (r.held.length && r.input.autoStow !== false) {
+          r.returnTo = r.elevTarget; // drop to reload, then come back to this shelf
+          r.elevTarget = 'stow';
+        }
+      }
       p.owner = a;
       p.level = level;
       const pts = F.POINTS.pantry[p.type][level];
@@ -905,7 +932,7 @@ export class Match {
       F.depotChutes(a).forEach((c, ci) => {
         inv.chuteTimers[ci] = Math.max(0, inv.chuteTimers[ci] - dt);
         if (!live || inv.chuteTimers[ci] > 0 || inv.depotCarrots <= 0) return;
-        const r = this.robots.find((q) => q.alliance === a && q.held.length + this.incoming(q) < F.MAX_HELD && this.inCatchZone(q, c));
+        const r = this.robots.find((q) => q.alliance === a && q.cfg.mods.depot && q.held.length + this.incoming(q) < F.MAX_HELD && this.inCatchZone(q, c));
         if (!r) return;
         inv.depotCarrots--;
         inv.chuteTimers[ci] = 0.9;
@@ -948,7 +975,7 @@ export class Match {
       for (const q of this.robots) {
         if (q.alliance !== a) continue;
         const still = Math.hypot(q.vx, q.vy) < 0.3 && Math.abs(q.w) < 0.6;
-        q.rampWait = live && still && this.inRampCatch(q) ? (q.rampWait || 0) + dt : 0;
+        q.rampWait = live && still && q.cfg.mods.ramp && this.inRampCatch(q) ? (q.rampWait || 0) + dt : 0;
       }
       const catcher = this.robots.find((q) => q.alliance === a && q.rampWait >= RAMP_WAIT && q.held.length + this.incoming(q) < F.MAX_HELD);
       if (live && inv.rampCakes > 0 && inv.rampTimer <= 0 && (catcher || this.autoRamp)) {
@@ -1103,7 +1130,7 @@ export class Match {
         r3(r.th),
         r3(r.elev),
         held(r),
-        (r.intake ? 1 : 0) | (r.taxi ? 2 : 0) | (r.parked ? 4 : 0),
+        (r.intake ? 1 : 0) | (r.taxi ? 2 : 0) | (r.parked ? 4 : 0) | (r.carriage ? 8 : 0),
         r3(r.vx),
         r3(r.vy),
         r3(r.w),
@@ -1132,7 +1159,7 @@ export class Match {
   }
 
   roster() {
-    return this.robots.map((r) => ({ id: r.id, alliance: r.alliance, station: r.station, name: r.name, team: r.team, robot: r.robot, bot: r.bot }));
+    return this.robots.map((r) => ({ id: r.id, alliance: r.alliance, station: r.station, name: r.name, team: r.team, robot: r.robot, mods: r.cfg.mods, bot: r.bot }));
   }
 }
 

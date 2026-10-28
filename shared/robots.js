@@ -68,6 +68,50 @@ export const ROBOTS = {
 };
 
 export const ROBOT_IDS = Object.keys(ROBOTS);
-export const getRobotConfig = (id) => ROBOTS[id] || ROBOTS.team;
+
+// ------------------------------------------------------------------ robot configuration options
+// Every drivetrain preset can be built with different mechanisms:
+//   ground   — floor intake (also reaches the cake on the dinner table)
+//   depot    — can catch carrots from the DEPOT chute
+//   ramp     — can catch carrot cakes rolling down the RAMP
+//   maxLevel — highest PANTRY shelf it can reach (0 = OVEN only)
+//   mech     — 'passthrough': pieces feed straight into the elevator carriage (all ride up together)
+//              'separate'   : pieces wait in a low hopper; the elevator carries ONE piece per trip and
+//                             reloads at the bottom (~0.45 s), but the robot stays stable when raised
+export const DEFAULT_MODS = { ground: true, depot: true, ramp: true, maxLevel: 3, mech: 'passthrough' };
+export const MECHS = { passthrough: 'Passthrough elevator', separate: 'Hopper + separate elevator' };
+export const LEVEL_NAMES = ['OVEN only', 'LEVEL 1', 'LEVEL 2', 'LEVEL 3'];
+
+export function sanitizeMods(m) {
+  const d = DEFAULT_MODS;
+  if (!m || typeof m !== 'object') return { ...d };
+  const lvl = Number.isInteger(m.maxLevel) ? Math.max(0, Math.min(3, m.maxLevel)) : d.maxLevel;
+  return {
+    ground: m.ground !== undefined ? !!m.ground : d.ground,
+    depot: m.depot !== undefined ? !!m.depot : d.depot,
+    ramp: m.ramp !== undefined ? !!m.ramp : d.ramp,
+    maxLevel: lvl,
+    mech: MECHS[m.mech] ? m.mech : d.mech,
+  };
+}
+
+export function modsLabel(m) {
+  const md = sanitizeMods(m);
+  const intakes = [md.ground && 'Ground', md.depot && 'Depot', md.ramp && 'Ramp'].filter(Boolean).join('/') || 'No intake';
+  return `${intakes} · ${md.maxLevel ? 'L' + md.maxLevel : 'Oven'} · ${md.mech === 'separate' ? 'Hopper+Elev' : 'Passthrough'}`;
+}
+
+const cfgCache = new Map();
+export function getRobotConfig(id, mods) {
+  const base = ROBOTS[id] || ROBOTS.team;
+  const md = sanitizeMods(mods);
+  const key = `${base.id}:${JSON.stringify(md)}`;
+  if (cfgCache.has(key)) return cfgCache.get(key);
+  const top = ['oven', 'l1', 'l2', 'l3'][md.maxLevel];
+  const max = Math.min(base.elevator.max, base.elevator.setpoints[top] + 0.03);
+  const cfg = { ...base, mods: md, elevator: { ...base.elevator, max } };
+  cfgCache.set(key, cfg);
+  return cfg;
+}
 
 export const SETPOINT_ORDER = ['stow', 'oven', 'l1', 'l2', 'l3'];

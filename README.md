@@ -48,6 +48,21 @@ Rules come from the Blair Bunnybots 2026 Game Manual v1.2; field geometry comes 
 
 Simplifications: pieces are scored when your robot is lined up at the right elevator height (no full 3D piece physics on shelves), human players are automatic, and judgment-call rules (pinning, damage, launching) aren't enforced.
 
+## Robot configuration
+
+Under **Mechanisms** on the main menu (saved per browser, shown to everyone in the lobby):
+
+| Option | Effect |
+| --- | --- |
+| Ground intake | Pick pieces off the carpet and the table cake. Off = no roller; get pieces from the DEPOT/RAMP only. |
+| Depot intake | Human player can drop carrots into you at your DEPOT chutes. |
+| Ramp intake | Catch stored CARROT CAKES at the bottom of your RAMP. |
+| Highest shelf | OVEN only, LEVEL 1, 2 or 3 — the elevator is built only that tall. |
+| Passthrough elevator | All held pieces ride the carriage; score back-to-back at a shelf, but driving gets twitchier when raised. |
+| Hopper + separate elevator | Pieces wait in a low hopper; the elevator takes one per lift and reloads at the bottom (~0.45 s, then goes back to the same shelf automatically with auto-stow on). Steadier when raised. |
+
+Pantry scoring only happens once the elevator has arrived at the shelf it was sent to.
+
 ## Your robot's CAD
 
 All robots are procedural placeholders for now. To drop in your team's CAD, see [`public/assets/robots/README.md`](public/assets/robots/README.md) — export a `.glb`, put it in `public/assets/robots/team/`, and set `model` on the `team` preset in `shared/robots.js`. Tune the preset's size, speed and elevator height to match the real robot.

@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import express from 'express';
 import { WebSocketServer } from 'ws';
 import { Room } from './room.js';
-import { ROBOTS } from '../shared/robots.js';
+import { ROBOTS, sanitizeMods } from '../shared/robots.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT) || 3000;
@@ -72,6 +72,7 @@ wss.on('connection', (ws) => {
           .replace(/\D/g, '')
           .slice(0, 5);
         if (ROBOTS[msg.robot]) player.robot = msg.robot;
+        if (msg.mods) player.mods = sanitizeMods(msg.mods);
         break;
       case 'ping':
         player.send({ t: 'pong', ts: msg.ts });

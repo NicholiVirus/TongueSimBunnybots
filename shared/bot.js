@@ -290,7 +290,7 @@ export class Bot {
     this.keepOutOfOpponentZones(r, inp);
 
     // task actions
-    if (t.sp && remaining < 1.6) inp.sp = t.sp;
+    if (t.sp && remaining < 1.6) inp.sp = r.cfg.mods.mech === 'separate' && t.kind === 'pantry' && !r.carriage ? 'stow' : t.sp; // separate elevator reloads low
     if (t.kind === 'collect' || t.kind === 'table') {
       inp.intake = remaining < 1.5;
       inp.sp = 'stow';
@@ -414,7 +414,7 @@ export class Bot {
       if (t) return t;
     }
 
-    if (r.held.length < F.MAX_HELD) {
+    if (r.held.length < F.MAX_HELD && r.cfg.mods.ground) {
       // closest loose piece we may legally chase
       let best = null;
       let bd = Infinity;
@@ -438,7 +438,7 @@ export class Bot {
         }
       }
       // DEPOT run when nothing is close
-      const depotT = m.inv[a].depotCarrots > 0 && !auto && m.timeLeft > F.TIMING.endgame + 10 ? this.depotTask(m, r) : null;
+      const depotT = r.cfg.mods.depot && m.inv[a].depotCarrots > 0 && !auto && m.timeLeft > F.TIMING.endgame + 10 ? this.depotTask(m, r) : null;
       const depotD = depotT ? Math.hypot(depotT.goal[0] - r.x, depotT.goal[1] - r.y) : Infinity;
       if (best && bd < depotD + 1.5) {
         // approach so the roller lines up with the piece axis — pick the side that keeps us out of opponent zones
@@ -479,6 +479,7 @@ export class Bot {
 
   // Only chase a cake if there's a free shelf slot and time to get it there before ENDGAME parking.
   cakeWorthChasing(m, r, p) {
+    if (!r.cfg.mods.ground) return false;
     // AUTO: exactly one bot per alliance rushes the table cake; partners work carrots into the oven
     if (m.phase === 'auto' && autoRusher(m, r.alliance) !== r.id) return false;
     if (p.st !== 'floor' && p.st !== 'table') return false;
@@ -507,7 +508,7 @@ export class Bot {
   rampTask(m, r) {
     const a = r.alliance;
     const inv = m.inv[a];
-    if (m.autoRamp || inv.rampCakes <= 0 || m.phase === 'auto') return null;
+    if (m.autoRamp || !r.cfg.mods.ramp || inv.rampCakes <= 0 || m.phase === 'auto') return null;
     // let cakes stock up and grab a full load of 3; take them one by one only when no more are
     // coming (no trades left / pending) or time is getting short
     const moreComing = inv.cakeBank > 0 || inv.ovenCarrots > 0;

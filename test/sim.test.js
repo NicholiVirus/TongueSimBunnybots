@@ -56,6 +56,41 @@ test('in AUTO one bot per alliance rushes the table cake, partners feed the oven
   assert.ok(m.score.red.ovenCarrot >= 3 && m.score.blue.ovenCarrot >= 3, 'partners put carrots in the oven during AUTO');
 });
 
+test('robot mechanism options are enforced', () => {
+  const slots = [
+    { id: 'a', alliance: 'red', station: 1, robot: 'team', mods: { ground: false, maxLevel: 1 } },
+    { id: 'b', alliance: 'red', station: 2, robot: 'team', mods: { mech: 'separate' } },
+  ];
+  const m = new Match({ slots });
+  const [a, b] = m.robots;
+  while (m.phase === 'countdown') m.step();
+  // no ground intake: a carrot right in front is not collected
+  const c = m.addPiece('carrot', a.x + Math.cos(a.th) * (a.cfg.length / 2 + 0.1), a.y + Math.sin(a.th) * (a.cfg.length / 2 + 0.1), a.th + Math.PI / 2, 'floor');
+  m.setInput('a', { intake: true });
+  for (let i = 0; i < 10; i++) m.step();
+  assert.equal(c.st, 'floor');
+  // max LEVEL 1: L2 is refused
+  m.setInput('a', { sp: 'l2' });
+  m.step();
+  assert.notEqual(a.elevTarget, 'l2');
+  // separate elevator: one piece per lift, reloads at the bottom, returns to the shelf by itself
+  b.x = F.pantrySlotX(2, 1);
+  b.y = F.PANTRY.yFront - b.cfg.length / 2;
+  b.th = Math.PI / 2;
+  for (let i = 0; i < 40; i++) m.step(); // load the carriage
+  m.setInput('b', { sp: 'l3' });
+  for (let i = 0; i < 60; i++) m.step();
+  m.setInput('b', { score: true });
+  m.step();
+  assert.equal(b.held.length, 1);
+  for (let i = 0; i < 20; i++) m.step();
+  assert.equal(b.held.length, 1, 'carriage empty: no second score until it reloads');
+  b.x += F.PIECE.length + 0.05; // slide over to an open gap
+  for (let i = 0; i < 60 * 3; i++) m.step();
+  assert.equal(b.held.length, 0, 'reloaded at the bottom, went back to L3 and scored again');
+  assert.equal(m.score.red.pantry[2].carrot, 2);
+});
+
 function fullBotMatch() {
   const slots = [];
   for (const alliance of ['red', 'blue']) for (const station of [1, 2, 3]) slots.push({ id: `${alliance}${station}`, alliance, station, robot: ['team', 'speedy', 'tank'][station - 1], bot: true });

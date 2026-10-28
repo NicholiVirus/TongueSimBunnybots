@@ -191,6 +191,18 @@ export class RobotView {
     this.roller.position.set(this.rollerIn[0], this.rollerIn[1], 0);
     b.add(this.roller);
 
+    if (!c.mods?.ground) this.roller.visible = false; // no ground intake fitted
+
+    // separate hopper: a low bin behind the elevator that holds pieces until the carriage reloads
+    this.separate = c.mods?.mech === 'separate';
+    if (this.separate) {
+      const binM = mat(0x3a4250, { metalness: 0.3, transparent: true, opacity: 0.85 });
+      const len = F.PIECE.length + 0.08;
+      tube(0.36, 0.012, len, ex - 0.12, 0.13, 0, binM);
+      for (const z of [len / 2, -len / 2]) tube(0.36, 0.2, 0.012, ex - 0.12, 0.23, z, binM);
+      tube(0.012, 0.2, len, ex - 0.3, 0.23, 0, binM);
+    }
+
     // "CAD goes here" badge on the elevator cross-bar
     const badge = new THREE.Mesh(
       new THREE.PlaneGeometry(0.34, 0.085),
@@ -277,15 +289,17 @@ export class RobotView {
       if (on) this.roller.rotation.z += dt * 22;
     }
 
-    // held pieces ride on the carriage
+    // passthrough: every held piece rides the carriage. separate: one on the carriage, rest in the hopper
     const held = st.held || '';
+    const onCarriage = this.separate ? (st.flags & 8 ? 1 : 0) : held.length;
     for (let i = 0; i < this.heldMeshes.length; i++) {
       const pair = this.heldMeshes[i];
-      const t = held[i];
+      const t = held[held.length - 1 - i]; // top piece (scored next) first
       pair.c.visible = t === 'c';
       pair.k.visible = t === 'k';
       const m = t === 'k' ? pair.k : pair.c;
-      m.position.set(-0.12, st.elev + i * 0.16 + F.PIECE.radius + 0.01, 0);
+      if (i < onCarriage) m.position.set(-0.12, st.elev + i * 0.16 + F.PIECE.radius + 0.01, 0);
+      else m.position.set(-0.24, 0.14 + (i - onCarriage) * 0.16 + F.PIECE.radius, 0);
     }
   }
 

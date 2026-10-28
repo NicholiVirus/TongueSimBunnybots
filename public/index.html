@@ -36,6 +36,20 @@
           <label>Team #<input id="in-team" maxlength="5" inputmode="numeric" placeholder="449" /></label>
           <label class="wide">Robot<select id="in-robot"></select></label>
           <p id="robot-blurb" class="muted small"></p>
+          <details class="config wide" id="cfg">
+            <summary>Mechanisms <span id="cfg-summary" class="muted small"></span></summary>
+            <div class="config-grid">
+              <label class="check"><input type="checkbox" id="cfg-ground" /> Ground intake</label>
+              <label class="check"><input type="checkbox" id="cfg-depot" /> Depot intake</label>
+              <label class="check"><input type="checkbox" id="cfg-ramp" /> Ramp intake (cakes)</label>
+              <label>Highest shelf
+                <select id="cfg-level"><option value="0">Oven only</option><option value="1">LEVEL 1</option><option value="2">LEVEL 2</option><option value="3">LEVEL 3</option></select>
+              </label>
+              <label class="wide">Scoring mechanism
+                <select id="cfg-mech"><option value="passthrough">Passthrough elevator — all pieces ride up</option><option value="separate">Hopper + separate elevator — one piece per lift</option></select>
+              </label>
+            </div>
+          </details>
         </div>
 
         <div class="menu-buttons">

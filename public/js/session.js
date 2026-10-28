@@ -68,16 +68,16 @@ const toSimInput = (i) => ({ seq: i.seq, mx: i.mx, my: i.my, rot: i.rot, intake:
 
 // ------------------------------------------------------------------ offline
 export class LocalSession {
-  constructor({ alliance = 'red', station = 2, robot = 'team', name = 'You', team = '', allies = 2, opps = 3, skill = 0.85, autoRamp = false }) {
-    this.opts = { alliance, station, robot, name, team, allies, opps, skill, autoRamp };
+  constructor({ alliance = 'red', station = 2, robot = 'team', mods, name = 'You', team = '', allies = 2, opps = 3, skill = 0.85, autoRamp = false }) {
+    this.opts = { alliance, station, robot, mods, name, team, allies, opps, skill, autoRamp };
     this.local = true;
     this.reset();
   }
 
   reset() {
-    const { alliance, station, robot, name, team, allies, opps, skill } = this.opts;
+    const { alliance, station, robot, mods, name, team, allies, opps, skill } = this.opts;
     const other = alliance === 'red' ? 'blue' : 'red';
-    const slots = [{ id: `${alliance}${station}`, alliance, station, robot, name, team }];
+    const slots = [{ id: `${alliance}${station}`, alliance, station, robot, mods, name, team }];
     const pool = ['team', 'speedy', 'tank'];
     const allyStations = [1, 2, 3].filter((s) => s !== station).slice(0, allies);
     allyStations.forEach((s, i) => slots.push({ id: `${alliance}${s}`, alliance, station: s, robot: pool[(i + 1) % 3], name: `Bot ${s}`, team: String(100 + s), bot: true }));
@@ -129,7 +129,7 @@ export class NetSession {
     this.roster = start.roster;
     this.you = start.you;
     this.me = this.roster.find((r) => r.id === this.you) || null;
-    this.cfg = this.me ? getRobotConfig(this.me.robot) : null;
+    this.cfg = this.me ? getRobotConfig(this.me.robot, this.me.mods) : null;
     this.interp = new Interp();
     this.events = [];
     this.seq = 0;

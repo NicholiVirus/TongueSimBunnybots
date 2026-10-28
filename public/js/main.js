@@ -1,5 +1,5 @@
 import { TICK } from '/shared/sim.js';
-import { ROBOTS, ROBOT_IDS, getRobotConfig } from '/shared/robots.js';
+import { ROBOTS, ROBOT_IDS, getRobotConfig, sanitizeMods, modsLabel } from '/shared/robots.js';
 import { SceneView } from './render/scene.js';
 import { Input } from './input.js';
 import { Hud, renderResults } from './hud.js';
@@ -67,7 +67,27 @@ $('in-team').value = settings.team;
 robotSel.value = ROBOTS[settings.robot] ? settings.robot : 'team';
 const updateBlurb = () => ($('robot-blurb').textContent = getRobotConfig(robotSel.value).blurb || '');
 updateBlurb();
-const profile = () => ({ name: $('in-name').value.trim() || 'Driver', team: $('in-team').value.replace(/\D/g, '').slice(0, 5), robot: robotSel.value });
+// mechanism configuration
+const readMods = () => sanitizeMods({ ground: $('cfg-ground').checked, depot: $('cfg-depot').checked, ramp: $('cfg-ramp').checked, maxLevel: Number($('cfg-level').value), mech: $('cfg-mech').value });
+const writeMods = (m) => {
+  const md = sanitizeMods(m);
+  $('cfg-ground').checked = md.ground;
+  $('cfg-depot').checked = md.depot;
+  $('cfg-ramp').checked = md.ramp;
+  $('cfg-level').value = String(md.maxLevel);
+  $('cfg-mech').value = md.mech;
+  $('cfg-summary').textContent = modsLabel(md);
+};
+writeMods(settings.mods);
+for (const id of ['cfg-ground', 'cfg-depot', 'cfg-ramp', 'cfg-level', 'cfg-mech']) {
+  $(id).addEventListener('change', () => {
+    settings.mods = readMods();
+    saveSettings();
+    writeMods(settings.mods);
+    if (net.connected) net.send({ t: 'robot', robot: robotSel.value, mods: settings.mods });
+  });
+}
+const profile = () => ({ name: $('in-name').value.trim() || 'Driver', team: $('in-team').value.replace(/\D/g, '').slice(0, 5), robot: robotSel.value, mods: readMods() });
 for (const el of [$('in-name'), $('in-team'), robotSel]) {
   el.addEventListener('change', () => {
     Object.assign(settings, profile());
@@ -75,7 +95,7 @@ for (const el of [$('in-name'), $('in-team'), robotSel]) {
     updateBlurb();
     if (net.connected) {
       net.send({ t: 'hello', ...profile() });
-      net.send({ t: 'robot', robot: robotSel.value });
+      net.send({ t: 'robot', robot: robotSel.value, mods: readMods() });
     }
   });
 }
@@ -98,6 +118,7 @@ const actions = {
       alliance: $('pr-alliance').value,
       station: Number($('pr-station').value),
       robot: p.robot,
+      mods: p.mods,
       name: p.name,
       team: p.team || '0000',
       allies: Number($('pr-allies').value),
@@ -321,13 +342,13 @@ function renderLobby(room) {
         btns = `<button class="btn tiny" data-action="take-slot" data-slot="${id}">Take</button>`;
         if (isHost) btns += ` <button class="btn tiny ghost" data-action="add-bot" data-slot="${id}">+ Bot</button>`;
       } else if (sl.type === 'bot') {
-        who = `<b>🤖 ${esc(sl.name)}</b><span>${esc(getRobotConfig(sl.robot).name)}</span>`;
+        who = `<b>🤖 ${esc(sl.name)}</b><span>${esc(getRobotConfig(sl.robot).name)}<span class="cfg-tag">${esc(modsLabel(sl.mods))}</span></span>`;
         btns = `<button class="btn tiny" data-action="take-slot" data-slot="${id}">Take</button>`;
         if (isHost) btns += ` <button class="btn tiny ghost" data-action="remove-bot" data-slot="${id}">✕</button>`;
       } else {
         const me = sl.pid === net.id;
         if (me) div.classList.add('me');
-        who = `<b>${esc(sl.name)}${sl.pid === room.host ? ' ★' : ''}</b><span>${sl.team ? '#' + esc(sl.team) + ' · ' : ''}${esc(getRobotConfig(sl.robot).name)}</span>`;
+        who = `<b>${esc(sl.name)}${sl.pid === room.host ? ' ★' : ''}</b><span>${sl.team ? '#' + esc(sl.team) + ' · ' : ''}${esc(getRobotConfig(sl.robot).name)}<span class="cfg-tag">${esc(modsLabel(sl.mods))}</span></span>`;
         if (isHost && !me) btns = `<button class="btn tiny ghost" data-action="kick" data-pid="${sl.pid}">Kick</button>`;
         if (me) {
           btns = `<select class="robot-pick">${ROBOT_IDS.map((r) => `<option value="${r}" ${r === sl.robot ? 'selected' : ''}>${esc(ROBOTS[r].name)}</option>`).join('')}</select>`;
@@ -342,7 +363,7 @@ function renderLobby(room) {
       robotSel.value = sel.value;
       settings.robot = sel.value;
       saveSettings();
-      net.send({ t: 'robot', robot: sel.value });
+      net.send({ t: 'robot', robot: sel.value, mods: readMods() });
     });
   }
   const ar = $('lobby-autoramp');

@@ -1,6 +1,6 @@
 import { Match, TICK } from '../shared/sim.js';
 import { Bot } from '../shared/bot.js';
-import { ROBOTS } from '../shared/robots.js';
+import { ROBOTS, sanitizeMods } from '../shared/robots.js';
 
 export const SLOT_IDS = ['red1', 'red2', 'red3', 'blue1', 'blue2', 'blue3'];
 const SNAP_EVERY = 2; // 60 Hz sim -> 30 Hz snapshots
@@ -61,7 +61,7 @@ export class Room {
       if (sl && sl.type === 'human' && sl.pid === player.id) {
         // mid-match, a bot takes over the robot; in the lobby the slot opens up
         if (this.match && this.phase === 'match') {
-          this.slots[s] = { type: 'bot', robot: player.robot, name: `${player.name} (bot)`, team: player.team };
+          this.slots[s] = { type: 'bot', robot: player.robot, mods: player.mods, name: `${player.name} (bot)`, team: player.team };
           this.bots.push(new Bot(s));
           this.match.bots = this.bots;
         } else this.slots[s] = null;
@@ -100,6 +100,7 @@ export class Room {
       }
       case 'robot':
         if (ROBOTS[msg.robot]) player.robot = msg.robot;
+        if (msg.mods) player.mods = sanitizeMods(msg.mods);
         this.broadcastRoom();
         break;
       case 'bot': {
@@ -161,12 +162,12 @@ export class Room {
       if (sl.type === 'human') {
         const p = this.players.get(sl.pid);
         if (!p) continue;
-        slots.push({ id: s, alliance, station, robot: p.robot, name: p.name, team: p.team });
+        slots.push({ id: s, alliance, station, robot: p.robot, mods: p.mods, name: p.name, team: p.team });
         p.queue = [];
         p.lastInput = {};
         p.idle = 0;
       } else {
-        slots.push({ id: s, alliance, station, robot: sl.robot, name: sl.name || 'Bot', team: sl.team || 'BOT', bot: true });
+        slots.push({ id: s, alliance, station, robot: sl.robot, mods: sl.mods, name: sl.name || 'Bot', team: sl.team || 'BOT', bot: true });
         this.bots.push(new Bot(s));
       }
     }
@@ -254,7 +255,7 @@ export class Room {
       else if (sl.type === 'bot') slots[s] = { type: 'bot', robot: sl.robot, name: sl.name || 'Bot' };
       else {
         const p = this.players.get(sl.pid);
-        slots[s] = p ? { type: 'human', pid: p.id, name: p.name, team: p.team, robot: p.robot } : null;
+        slots[s] = p ? { type: 'human', pid: p.id, name: p.name, team: p.team, robot: p.robot, mods: p.mods } : null;
       }
     }
     const seated = new Set(SLOT_IDS.map((s) => this.slots[s]?.pid).filter(Boolean));
