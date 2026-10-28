@@ -1088,7 +1088,7 @@ export class Match {
         if (inv.tradeTimer >= 1.5) {
           inv.tradeTimer = 0;
           inv.ovenCarrots -= 3;
-          this.inv[F.opponent(a)].depotCarrots += 3;
+          inv.depotCarrots += 3; // house rule: the carrots go back to this alliance's own DEPOT (manual: opposing depot)
           if (inv.cakeBank > 0) {
             inv.cakeBank--;
             inv.rampCakes++;

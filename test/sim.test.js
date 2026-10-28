@@ -262,7 +262,7 @@ test('oven carrots recirculate into a cake on the ramp', () => {
   const m = new Match({ slots: [{ id: 'a', alliance: 'red', station: 1, robot: 'team' }], preload: 0 });
   const r = m.robots[0];
   while (m.phase === 'countdown') m.step();
-  const startDepotBlue = m.inv.blue.depotCarrots;
+  const startDepotRed = m.inv.red.depotCarrots;
   for (let i = 0; i < 3; i++) {
     const p = m.addPiece('carrot', 0, 0, 0, 'held');
     p.holder = r.id;
@@ -275,7 +275,7 @@ test('oven carrots recirculate into a cake on the ramp', () => {
   for (let i = 0; i < 60 * 3; i++) m.step();
   assert.equal(r.held.length, 0);
   assert.equal(m.score.red.totals.oven, 6);
-  assert.equal(m.inv.blue.depotCarrots, startDepotBlue + 3, 'carrots handed to the opposing depot');
+  assert.equal(m.inv.red.depotCarrots, startDepotRed + 3, 'oven carrots return to our own depot');
   assert.equal(m.inv.red.cakeBank, 8);
   assert.equal(m.inv.red.rampCakes, 1, 'the baked cake is stored at the ramp');
   assert.equal(m.pieces.filter((p) => p.type === 'cake' && p.st !== 'table').length, 0, 'nothing rolls down without a robot waiting');
