@@ -138,7 +138,7 @@ const actions = {
       robot: p.robot,
       mods: p.mods,
       name: p.name,
-      team: p.team || '0000',
+      team: p.team || '709',
       allies: Number($('pr-allies').value),
       opps: Number($('pr-opps').value),
       skill: Number($('pr-skill').value),

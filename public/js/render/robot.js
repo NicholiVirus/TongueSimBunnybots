@@ -70,7 +70,7 @@ export class RobotView {
     add(Lr - 2 * BUMPER_T, BUMPER_T, 0, Wr / 2 - BUMPER_T / 2);
     add(Lr - 2 * BUMPER_T, BUMPER_T, 0, -Wr / 2 + BUMPER_T / 2);
     // team numbers on all four sides
-    const num = String(this.info.team || '0000');
+    const num = String(this.info.team || '709');
     const tex = textCanvas(num, { w: 512, h: 128, font: 'bold 112px "Barlow Condensed", Arial Narrow, sans-serif', color: '#ffffff' });
     const nm = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
     const plane = (w, x, z, ry) => {
