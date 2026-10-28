@@ -35,6 +35,20 @@ export class RobotView {
     this.buildHeld();
     this.label = labelSprite(`${info.team || ''} ${info.name || ''}`.trim(), info.alliance === 'red' ? '#ffb3b5' : '#b9d0ff', 1.1);
     this.label.position.y = 2.0;
+    // team 612 victims
+    this.stunLabel = labelSprite('⚡ STUNNED ⚡', '#ffe14a', 1.2);
+    this.stunLabel.position.y = 1.6;
+    this.stunLabel.visible = false;
+    this.group.add(this.stunLabel);
+    // team 611 tongue on the end effector
+    const tongue = new THREE.Mesh(new THREE.CapsuleGeometry(0.05, 0.32, 6, 12), new THREE.MeshStandardMaterial({ color: 0xff5f8f, roughness: 0.45, emissive: 0x4a0a1e, emissiveIntensity: 0.3 }));
+    tongue.rotation.z = Math.PI / 2;
+    tongue.scale.set(0.45, 1, 2.2);
+    tongue.castShadow = true;
+    tongue.visible = false;
+    this.tongue = tongue;
+    this.tongueOut = 0;
+    this.group.add(tongue);
     this.group.add(this.label);
     if (cfg.model?.url) this.loadCad(cfg.model);
   }
@@ -285,6 +299,19 @@ export class RobotView {
       if (sp > 0.05) m.g.rotation.y = Math.atan2(mvy, mvx);
       this.wheels[i].rotation.z -= (sp / 0.05) * dt;
     }
+    // tongue slides out of the end effector (elevator side) and wiggles
+    const tOn = !!(st.flags & 16);
+    this.tongueOut += ((tOn ? 1 : 0) - this.tongueOut) * Math.min(1, dt * 10);
+    this.tongue.visible = this.tongueOut > 0.02;
+    if (this.tongue.visible) {
+      const side = this.cfg.mods?.mech === 'opposite' ? -1 : 1;
+      const reach = this.cfg.length / 2 - 0.1 + 0.3 * this.tongueOut;
+      this.wiggle = (this.wiggle || 0) + dt * 9;
+      this.tongue.position.set(side * reach, st.elev + 0.1, Math.sin(this.wiggle) * 0.03);
+      this.tongue.scale.set(0.45, this.tongueOut, 2.2);
+    }
+    this.stunLabel.visible = !!(st.flags & 32);
+
     if (this.roller) {
       const on = !!(st.flags & 1);
       this.deploy += ((on ? 1 : 0) - this.deploy) * Math.min(1, dt * 12);

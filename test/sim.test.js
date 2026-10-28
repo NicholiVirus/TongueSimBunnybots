@@ -115,6 +115,61 @@ test('elevator-back robots score with their back to the pantry; depot auto-align
   assert.equal(alignTarget(r, 'red').kind, 'depot');
 });
 
+test('team 611 tongue slides scored pieces along the shelf; others cannot deploy it', () => {
+  const m = new Match({
+    slots: [
+      { id: 'a', alliance: 'red', station: 1, robot: 'team', team: '611' },
+      { id: 'b', alliance: 'blue', station: 1, robot: 'team', team: '449' },
+    ],
+  });
+  const [a, b] = m.robots;
+  while (m.phase === 'countdown') m.step();
+  m.setInput('b', { tongue: true });
+  m.step();
+  assert.ok(!b.tongue, 'only 611 has a tongue');
+  // a carrot sitting on red LEVEL 1
+  const p = m.addPiece('carrot', 6.2, 4.02, 0, 'pantry');
+  p.z = F.PANTRY.shelfZ[0];
+  m.pantry.red[0].push(p.id);
+  a.x = 6.2;
+  a.y = F.PANTRY.yFront - a.cfg.length / 2 - 0.02;
+  a.th = Math.PI / 2;
+  m.setInput('a', { tongue: true, sp: 'l1' });
+  m.step();
+  m.setInput('a', { sp: 'l1' });
+  for (let i = 0; i < 40; i++) m.step();
+  assert.ok(a.tongue);
+  m.setInput('a', { mx: 0.6, my: 0 }); // drive right (+x)
+  for (let i = 0; i < 30; i++) m.step();
+  assert.ok(p.x > 6.4, `carrot slid right to ${p.x.toFixed(2)}`);
+  assert.ok(p.x <= F.PANTRY.x1 - F.PIECE.length / 2 + 1e-6, 'stays on the shelf');
+});
+
+test('team 612 freezes robots it hits for 5 s', () => {
+  const m = new Match({
+    slots: [
+      { id: 'a', alliance: 'red', station: 1, robot: 'team', team: '612' },
+      { id: 'b', alliance: 'blue', station: 1, robot: 'team', team: '449' },
+    ],
+  });
+  const [a, b] = m.robots;
+  while (m.phase === 'countdown') m.step();
+  a.x = 1;
+  a.y = 0 + 2;
+  b.x = 1 - a.cfg.length;
+  b.y = 2;
+  m.setInput('a', { mx: -1 });
+  for (let i = 0; i < 20; i++) m.step();
+  assert.ok(b.stunUntil > m.time, 'victim stunned');
+  const x0 = b.x;
+  m.setInput('a', { mx: 1 }); // back off
+  m.setInput('b', { mx: 1, intake: true });
+  for (let i = 0; i < 60 * 3; i++) m.step();
+  assert.ok(Math.abs(b.x - x0) < 0.3 && !b.intake, 'frozen: no driving, no mechanisms');
+  for (let i = 0; i < 60 * 2.5; i++) m.step();
+  assert.ok(b.x - x0 > 0.3, 'moves again after 5 s');
+});
+
 function fullBotMatch() {
   const slots = [];
   for (const alliance of ['red', 'blue']) for (const station of [1, 2, 3]) slots.push({ id: `${alliance}${station}`, alliance, station, robot: ['team', 'speedy', 'tank'][station - 1], bot: true });

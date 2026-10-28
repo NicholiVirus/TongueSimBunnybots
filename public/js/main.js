@@ -489,6 +489,13 @@ function handleEvents(events) {
         hud.toast(`+${e.pts}  ${e.label}`, e.alliance);
         if (e.robot === you) audio.score();
         break;
+      case 'stun': {
+        const by = app.rosterById.get(e.by);
+        const v = app.rosterById.get(e.robot);
+        hud.toast(`⚡ ${by?.team || ''} STUNNED ${v?.team || v?.name || ''} for 5 s`, 'foul');
+        if (e.robot === you) hud.hint('⚡ Stunned by team 612 — frozen for 5 s');
+        break;
+      }
       case 'foul':
         hud.toast(`FOUL ${e.rule} — ${e.alliance.toUpperCase()} (${e.desc}) +${e.pts} ${e.alliance === 'red' ? 'BLUE' : 'RED'}`, 'foul');
         audio.foul();

@@ -64,7 +64,7 @@ class Interp {
   }
 }
 
-const toSimInput = (i) => ({ seq: i.seq, mx: i.mx, my: i.my, rot: i.rot, intake: !!i.in, score: !!i.sc, eject: !!i.ej, align: !!i.al, sp: i.sp || null, autoStow: i.as !== false });
+const toSimInput = (i) => ({ seq: i.seq, mx: i.mx, my: i.my, rot: i.rot, intake: !!i.in, score: !!i.sc, eject: !!i.ej, align: !!i.al, tongue: !!i.tg, sp: i.sp || null, autoStow: i.as !== false });
 
 // ------------------------------------------------------------------ offline
 export class LocalSession {
@@ -165,7 +165,7 @@ export class NetSession {
     const base = { cfg: this.cfg, x: e[1], y: e[2], th: e[3], elev: e[4], vx: e[7], vy: e[8], w: e[9] };
     const ack = e[10];
     this.pending = this.pending.filter((p) => p.seq > ack);
-    const en = s.ph === 'auto' || s.ph === 'teleop';
+    const en = (s.ph === 'auto' || s.ph === 'teleop') && !(e[6] & 32); // not while stunned
     for (const p of this.pending) {
       driveStep(base, assistInput(base, toSimInput(p.inp), this.me.alliance), TICK, en);
       collideRobotStatic(base);
@@ -185,7 +185,7 @@ export class NetSession {
     this.net.send({ t: 'in', i: [inp] });
     const latest = this.interp.latest;
     if (this.pred && latest) {
-      const en = latest.ph === 'auto' || latest.ph === 'teleop';
+      const en = (latest.ph === 'auto' || latest.ph === 'teleop') && !((latest.r.find((q) => q[0] === this.you)?.[6] ?? 0) & 32);
       this.pred.elev = latest.r.find((q) => q[0] === this.you)?.[4] ?? this.pred.elev;
       driveStep(this.pred, assistInput(this.pred, toSimInput(inp), this.me.alliance), TICK, en);
       collideRobotStatic(this.pred);

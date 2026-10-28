@@ -68,6 +68,11 @@ In **Practice**, every bot spawns with a random build; the setup screen lists ea
 
 Auto-align (Space) also works at your **DEPOT** chutes: it parks you right under the mouth.
 
+## Team easter eggs
+
+- **Team 611** — press **K** to deploy a tongue 👅 on the end effector. While it's out, driving left/right (A/D) slides carrots sideways: pieces already on your shelf at the tongue's height slide along it (pushing neighbors, never off the ends), and floor pieces in front get swept along.
+- **Team 612** — any robot you bump is frozen for **5 s** (no driving, no mechanisms), then immune for 2 s.
+
 ## Your robot's CAD
 
 All robots are procedural placeholders for now. To drop in your team's CAD, see [`public/assets/robots/README.md`](public/assets/robots/README.md) — export a `.glb`, put it in `public/assets/robots/team/`, and set `model` on the `team` preset in `shared/robots.js`. Tune the preset's size, speed and elevator height to match the real robot.

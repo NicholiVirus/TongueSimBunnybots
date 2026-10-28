@@ -34,6 +34,7 @@ export class Input {
     this.keys.add(e.code);
     if (SP_KEYS[e.code]) this.setSp(SP_KEYS[e.code]);
     if (e.code === 'KeyG') this.ejectHold = 3;
+    if (e.code === 'KeyK') this.tongueHold = 3;
     if (e.code === 'KeyF' || e.code === 'Enter') this.scoreHold = 6; // a quick tap still scores
     if (e.code === 'KeyC') this.actions.push('camera');
     if (e.code === 'KeyV') this.actions.push('orient');
@@ -114,7 +115,8 @@ export class Input {
     const mx = fx * fwd + rx2 * strafe;
     const my = fy * fwd + ry2 * strafe;
 
-    const out = { mx: round(mx), my: round(my), rot: round(rot), in: intake, sc: score, ej: this.ejectHold > 0, al: align, as: autoStow };
+    const out = { mx: round(mx), my: round(my), rot: round(rot), in: intake, sc: score, ej: this.ejectHold > 0, al: align, tg: this.tongueHold > 0, as: autoStow };
+    if (this.tongueHold > 0) this.tongueHold--;
     if (this.spHold > 0) {
       out.sp = this.sp;
       this.spHold--;

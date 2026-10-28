@@ -12,6 +12,9 @@ const SUB = [-(PIECE.length / 2 - PR), 0, PIECE.length / 2 - PR]; // sub-circle 
 const PIECE_I = PIECE.length ** 2 / 12 + PR ** 2 / 4; // inertia / mass
 const GRAV = 9.81;
 const HOLD_SPACING = 0.16;
+export const TONGUE_TEAM = '611';
+export const STUN_TEAM = '612';
+export const STUN_TIME = 5;
 export const LOAD_TIME = 0.45; // s for a separate elevator to take a piece from the hopper
 export const RAMP_WAIT = 1; // s a robot must sit at the foot of the ramp before cakes roll
 export const RAMP_GAP = 0.5; // s between cakes rolling down
@@ -414,6 +417,16 @@ export class Match {
   updateRobot(r, dt, en) {
     const inp = r.input || {};
     const e = r.cfg.elevator;
+    if (r.stunUntil > this.time) en = false; // hit by team 612: frozen
+
+    // TEAM 611 easter egg: K deploys a tongue on the end effector
+    if (en && inp.tongue && !r.prevTongue) {
+      if (r.team === TONGUE_TEAM) {
+        r.tongue = !r.tongue;
+        this.emit({ type: 'hint', robot: r.id, msg: r.tongue ? '👅 Tongue out — slide carrots with A/D' : 'Tongue in' });
+      } else this.denied(r, `Only team ${TONGUE_TEAM} has a tongue 👅`);
+    }
+    r.prevTongue = !!inp.tongue;
     if (en && inp.sp && e.setpoints[inp.sp] !== undefined && inp.sp !== r.elevTarget) {
       if (e.setpoints[inp.sp] > e.max + 1e-6) this.denied(r, `This robot's elevator can't reach ${inp.sp.toUpperCase()}`);
       else r.elevTarget = inp.sp;
@@ -446,6 +459,59 @@ export class Match {
     if (inp.score && this.time - r.lastScore >= r.cfg.scoreCooldown && r.held.length) this.tryScore(r);
     if (inp.eject && !r.prevEject && r.held.length) this.eject(r);
     r.prevEject = !!inp.eject;
+    if (r.tongue) this.tongueSlide(r, dt);
+  }
+
+  // Pieces in front of the tongue get dragged sideways with the robot: scored pieces slide along the
+  // shelf at the tongue's height (pushing neighbours, never off the ends), floor pieces get swept.
+  tongueSlide(r, dt) {
+    const ss = shelfSide(r.cfg.mods);
+    const fx = Math.cos(r.th) * ss;
+    const fy = Math.sin(r.th) * ss;
+    const lx = -fy;
+    const ly = fx;
+    const half = r.cfg.length / 2;
+    const reachW = r.cfg.width / 2 + 0.15;
+    const vLat = r.vx * lx + r.vy * ly;
+    // floor
+    for (const p of this.pieces) {
+      if (p.st !== 'floor' || p.z > 0.3 || r.elev > 0.5) continue;
+      const ox = p.x - r.x;
+      const oy = p.y - r.y;
+      const fwd = ox * fx + oy * fy;
+      const lat = ox * lx + oy * ly;
+      if (fwd < half - 0.05 || fwd > half + 0.4 || Math.abs(lat) > reachW) continue;
+      const pl = p.vx * lx + p.vy * ly;
+      p.vx += (vLat - pl) * lx;
+      p.vy += (vLat - pl) * ly;
+    }
+    // shelf (own PANTRY, facing it, tongue level with a shelf)
+    const tipY = r.y + fy * half;
+    if (fy < 0.8 || tipY < F.PANTRY.yFront - 0.3 || Math.abs(vLat) < 0.02) return;
+    const level = F.PANTRY.shelfZ.findIndex((z) => Math.abs(r.elev - z) < 0.15);
+    if (level < 0) return;
+    const pb = F.pantryBox(r.alliance);
+    const L = PIECE.length;
+    const lo = pb.x0 + L / 2;
+    const hi = pb.x1 - L / 2;
+    const ps = this.pantry[r.alliance][level]
+      .map((id) => this.pieces.find((q) => q.id === id))
+      .filter((p) => p.st === 'pantry')
+      .sort((a, b) => a.x - b.x);
+    if (!ps.length) return;
+    const dx = r.vx * dt; // shelf runs along field X
+    const xs = ps.map((p) => p.x);
+    ps.forEach((p, i) => {
+      if (Math.abs(p.x - r.x) < reachW) xs[i] += dx;
+    });
+    if (dx > 0) {
+      for (let i = 1; i < xs.length; i++) xs[i] = Math.max(xs[i], xs[i - 1] + L);
+      for (let i = xs.length - 1; i >= 0; i--) xs[i] = Math.min(xs[i], i === xs.length - 1 ? hi : xs[i + 1] - L);
+    } else {
+      for (let i = xs.length - 2; i >= 0; i--) xs[i] = Math.min(xs[i], xs[i + 1] - L);
+      for (let i = 0; i < xs.length; i++) xs[i] = Math.max(xs[i], i === 0 ? lo : xs[i - 1] + L);
+    }
+    ps.forEach((p, i) => (p.x = xs[i]));
   }
 
   collideRobots() {
@@ -458,7 +524,11 @@ export class Match {
           const b = rs[j];
           const reach = (a.cfg.length + a.cfg.width + b.cfg.length + b.cfg.width) / 2.6;
           if (Math.abs(a.x - b.x) > reach || Math.abs(a.y - b.y) > reach) continue;
-          if (iter === 0 && obbOverlap(inflate(robotBox(a), 0.03), robotBox(b))) this.contacts.push([a, b]);
+          if (iter === 0 && obbOverlap(inflate(robotBox(a), 0.03), robotBox(b))) {
+            this.contacts.push([a, b]);
+            this.stunCheck(a, b);
+            this.stunCheck(b, a);
+          }
           const m = obbOverlap(robotBox(a), robotBox(b));
           if (!m) continue;
           const ia = 1 / a.cfg.mass;
@@ -483,6 +553,16 @@ export class Match {
       }
       for (const r of rs) collideRobotStatic(r);
     }
+  }
+
+  // TEAM 612 easter egg: ramming another robot freezes it for STUN_TIME s (then a short immunity)
+  stunCheck(hitter, victim) {
+    if (hitter.team !== STUN_TEAM || victim.team === STUN_TEAM || !this.enabled) return;
+    if (hitter.stunUntil > this.time || (victim.stunImmuneUntil || 0) > this.time) return;
+    victim.stunUntil = this.time + STUN_TIME;
+    victim.stunImmuneUntil = this.time + STUN_TIME + 2;
+    victim.intake = false;
+    this.emit({ type: 'stun', robot: victim.id, by: hitter.id });
   }
 
   frontPoint(r, extra = 0) {
@@ -1151,7 +1231,7 @@ export class Match {
         r3(r.th),
         r3(r.elev),
         held(r),
-        (r.intake ? 1 : 0) | (r.taxi ? 2 : 0) | (r.parked ? 4 : 0) | (r.carriage ? 8 : 0),
+        (r.intake ? 1 : 0) | (r.taxi ? 2 : 0) | (r.parked ? 4 : 0) | (r.carriage ? 8 : 0) | (r.tongue ? 16 : 0) | (r.stunUntil > this.time ? 32 : 0),
         r3(r.vx),
         r3(r.vy),
         r3(r.w),
