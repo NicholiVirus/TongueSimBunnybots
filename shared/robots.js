@@ -82,8 +82,17 @@ export const ROBOT_IDS = Object.keys(ROBOTS);
 //                             but the robot scores on the shelves with its back to the pantry
 export const DEFAULT_MODS = { ground: true, depot: true, ramp: true, maxLevel: 3, mech: 'passthrough' };
 export const MECHS = { passthrough: 'Passthrough elevator', separate: 'Hopper + separate elevator', opposite: 'Hopper front + elevator back' };
-// one piece per lift, reloaded from a hopper
-export const isOneAtATime = (mods) => mods?.mech === 'separate' || mods?.mech === 'opposite';
+// mechanisms that only come from a team lock (not selectable in menus)
+const LOCKED_MECHS = { elevIntake: 'Ground-intake elevator + depot/ramp hopper' };
+// one piece per lift
+export const isOneAtATime = (mods) => mods?.mech === 'separate' || mods?.mech === 'opposite' || mods?.mech === 'elevIntake';
+// the elevator reloads from the hopper at the bottom
+export const reloadsFromHopper = (mods) => mods?.mech === 'separate' || mods?.mech === 'opposite';
+
+// TEAM 526 easter egg: locked build — L1 max, the elevator IS the ground intake (holds 1 piece and
+// scores it), and a separate hopper fed only by the DEPOT/RAMP that can only dump into the OVEN.
+export const TEAM_LOCKS = { 526: { ground: true, depot: true, ramp: true, maxLevel: 1, mech: 'elevIntake' } };
+export const effectiveMods = (team, mods) => sanitizeMods(TEAM_LOCKS[String(team ?? '')] || mods);
 // which way the robot faces the PANTRY: +1 front, -1 back
 export const shelfSide = (mods) => (mods?.mech === 'opposite' ? -1 : 1);
 
@@ -109,14 +118,14 @@ export function sanitizeMods(m) {
     depot: m.depot !== undefined ? !!m.depot : d.depot,
     ramp: m.ramp !== undefined ? !!m.ramp : d.ramp,
     maxLevel: lvl,
-    mech: MECHS[m.mech] ? m.mech : d.mech,
+    mech: MECHS[m.mech] || LOCKED_MECHS[m.mech] ? m.mech : d.mech,
   };
 }
 
 export function modsLabel(m) {
   const md = sanitizeMods(m);
   const intakes = [md.ground && 'Ground', md.depot && 'Depot', md.ramp && 'Ramp'].filter(Boolean).join('/') || 'No intake';
-  return `${intakes} · ${md.maxLevel ? 'L' + md.maxLevel : 'Oven'} · ${{ passthrough: 'Passthrough', separate: 'Hopper+Elev', opposite: 'Hopper|Elev opposite' }[md.mech]}`;
+  return `${intakes} · ${md.maxLevel ? 'L' + md.maxLevel : 'Oven'} · ${{ passthrough: 'Passthrough', separate: 'Hopper+Elev', opposite: 'Hopper|Elev opposite', elevIntake: 'Intake-elevator + hopper (526)' }[md.mech]}`;
 }
 
 const cfgCache = new Map();

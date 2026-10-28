@@ -1,5 +1,5 @@
 import { TICK } from '/shared/sim.js';
-import { ROBOTS, ROBOT_IDS, getRobotConfig, sanitizeMods, modsLabel, randomMods, MECHS } from '/shared/robots.js';
+import { ROBOTS, ROBOT_IDS, getRobotConfig, sanitizeMods, modsLabel, randomMods, MECHS, TEAM_LOCKS } from '/shared/robots.js';
 import { SceneView } from './render/scene.js';
 import { Input } from './input.js';
 import { Hud, renderResults } from './hud.js';
@@ -69,14 +69,19 @@ const updateBlurb = () => ($('robot-blurb').textContent = getRobotConfig(robotSe
 updateBlurb();
 // mechanism configuration
 const readMods = () => sanitizeMods({ ground: $('cfg-ground').checked, depot: $('cfg-depot').checked, ramp: $('cfg-ramp').checked, maxLevel: Number($('cfg-level').value), mech: $('cfg-mech').value });
+const CFG_IDS = ['cfg-ground', 'cfg-depot', 'cfg-ramp', 'cfg-level', 'cfg-mech'];
 const writeMods = (m) => {
-  const md = sanitizeMods(m);
+  // some team numbers come with a locked build (e.g. 526)
+  const lock = TEAM_LOCKS[$('in-team').value.trim()];
+  for (const id of CFG_IDS) $(id).disabled = !!lock;
+  const md = sanitizeMods(lock || m);
+  if (lock && ![...$('cfg-mech').options].some((o) => o.value === md.mech)) $('cfg-mech').add(new Option(`Team ${$('in-team').value.trim()} build (locked)`, md.mech));
   $('cfg-ground').checked = md.ground;
   $('cfg-depot').checked = md.depot;
   $('cfg-ramp').checked = md.ramp;
   $('cfg-level').value = String(md.maxLevel);
   $('cfg-mech').value = md.mech;
-  $('cfg-summary').textContent = modsLabel(md);
+  $('cfg-summary').textContent = modsLabel(md) + (lock ? ' 🔒' : '');
 };
 writeMods(settings.mods);
 for (const id of ['cfg-ground', 'cfg-depot', 'cfg-ramp', 'cfg-level', 'cfg-mech']) {
@@ -87,12 +92,18 @@ for (const id of ['cfg-ground', 'cfg-depot', 'cfg-ramp', 'cfg-level', 'cfg-mech'
     if (net.connected) net.send({ t: 'robot', robot: robotSel.value, mods: settings.mods });
   });
 }
-const profile = () => ({ name: $('in-name').value.trim() || 'Driver', team: $('in-team').value.replace(/\D/g, '').slice(0, 5), robot: robotSel.value, mods: readMods() });
+const profile = () => ({
+  name: $('in-name').value.trim() || 'Driver',
+  team: $('in-team').value.replace(/\D/g, '').slice(0, 5),
+  robot: robotSel.value,
+  mods: TEAM_LOCKS[$('in-team').value.trim()] ? settings.mods : readMods(),
+});
 for (const el of [$('in-name'), $('in-team'), robotSel]) {
   el.addEventListener('change', () => {
     Object.assign(settings, profile());
     saveSettings();
     updateBlurb();
+    writeMods(settings.mods);
     if (net.connected) {
       net.send({ t: 'hello', ...profile() });
       net.send({ t: 'robot', robot: robotSel.value, mods: readMods() });

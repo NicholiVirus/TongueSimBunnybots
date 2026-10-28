@@ -2,7 +2,7 @@
 // (online play) and in the browser (offline practice). Fixed 60 Hz step.
 
 import * as F from './field.js';
-import { getRobotConfig, isOneAtATime, shelfSide } from './robots.js';
+import { getRobotConfig, isOneAtATime, reloadsFromHopper, shelfSide, effectiveMods } from './robots.js';
 
 export const TICK = 1 / 60;
 
@@ -273,7 +273,7 @@ export class Match {
     this.tick = 0;
 
     for (const s of slots) {
-      const cfg = getRobotConfig(s.robot, s.mods);
+      const cfg = getRobotConfig(s.robot, effectiveMods(s.team, s.mods));
       const p = F.startPose(s.alliance, s.station);
       this.robots.push({
         id: s.id,
@@ -438,7 +438,16 @@ export class Match {
     if (en && inp.intake && !mods.ground) this.denied(r, 'This robot has no ground intake — use the DEPOT or RAMP');
 
     // separate hopper + elevator: the carriage carries one piece and reloads at the bottom
-    if (isOneAtATime(mods)) {
+    if (mods.mech === 'elevIntake') {
+      // the elevator is the ground intake: it holds one piece (always the last in `held`)
+      if (r.carriagePiece && !r.held.includes(r.carriagePiece)) r.carriagePiece = null;
+      r.carriage = r.carriagePiece ? 1 : 0;
+      if (r.intake && r.carriagePiece) {
+        r.intake = false;
+        if (inp.intake) this.denied(r, 'Elevator already holds a piece — score it on L1 or in the OVEN');
+      }
+    }
+    if (reloadsFromHopper(mods)) {
       r.carriage = Math.min(r.carriage || 0, r.held.length);
       if (!r.carriage && r.held.length && r.elev <= e.min + 0.04) {
         r.loadT = (r.loadT || 0) + dt;
@@ -607,11 +616,11 @@ export class Match {
       if (shelfFit(xs, ex, a) === null) return this.denied(r, `LEVEL ${level + 1} is full`);
       const px = shelfFit(xs, ex, a, 0.12);
       if (px === null) return this.denied(r, 'No room there — slide left/right to a gap');
-      const p = this.popHeld(r, 'cake');
+      const p = r.cfg.mods.mech === 'elevIntake' ? this.popHeldId(r, r.carriagePiece) : this.popHeld(r, 'cake');
       shelf.push(p.id);
       const to = { x: px, y: (F.PANTRY.yFront + F.PANTRY.yBack) / 2 + 0.005, z: F.PANTRY.shelfZ[level], th: 0 };
       this.startPlace(p, r, to, 'pantry', 0.22);
-      if (isOneAtATime(r.cfg.mods)) {
+      if (reloadsFromHopper(r.cfg.mods)) {
         r.carriage = 0;
         if (r.held.length && r.input.autoStow !== false) {
           r.returnTo = r.elevTarget; // drop to reload, then come back to this shelf
@@ -643,7 +652,9 @@ export class Match {
       for (const f of faces) {
         if (!f.ok) continue;
         if (fwdX * f.n[0] + fwdY * f.n[1] < Math.cos((40 * Math.PI) / 180)) continue;
-        const p = this.popHeld(r, 'carrot');
+        // a 526 hopper dumps its own pieces first; the elevator's piece goes last
+        const hopper = r.cfg.mods.mech === 'elevIntake' ? r.held.filter((id) => id !== r.carriagePiece) : null;
+        const p = hopper?.length ? this.popHeldId(r, hopper.find((id) => this.pieces.find((q) => q.id === id)?.type === 'carrot') ?? hopper[hopper.length - 1]) : this.popHeld(r, 'carrot');
         const to = { x: (mx0 + mx1) / 2, y: F.OVEN.yc, z: 0.2, th: 0 };
         this.startPlace(p, r, to, 'oven', 0.3);
         p.owner = a;
@@ -677,6 +688,22 @@ export class Match {
       const p = this.pieces.find((q) => q.id === id);
       return p.anim ? p.anim.to.x : p.x;
     });
+  }
+
+  popHeldId(r, id) {
+    const i = r.held.indexOf(id);
+    const [pid] = r.held.splice(i < 0 ? r.held.length - 1 : i, 1);
+    if (pid === r.carriagePiece) r.carriagePiece = null;
+    const p = this.pieces.find((q) => q.id === pid);
+    Object.assign(p, this.heldWorldPos(r, r.held.length));
+    p.holder = null;
+    return p;
+  }
+
+  // a 526 hopper fills underneath the elevator's piece, which stays last in `held`
+  addHeld(r, id) {
+    if (r.cfg.mods.mech === 'elevIntake' && r.carriagePiece) r.held.splice(r.held.length - 1, 0, id);
+    else r.held.push(id);
   }
 
   // The mechanism hands over the preferred piece type first (cakes to the pantry, carrots to the oven).
@@ -824,7 +851,7 @@ export class Match {
         p.st = 'held';
         p.holder = r.id;
         p.anim = null;
-        r.held.push(p.id);
+        this.addHeld(r, p.id);
         this.emit({ type: 'feed', robot: r.id });
       } else {
         const c = an.chute;
@@ -843,7 +870,7 @@ export class Match {
         p.st = 'held';
         p.holder = r.id;
         p.anim = null;
-        r.held.push(p.id);
+        this.addHeld(r, p.id);
         this.emit({ type: 'feed', robot: r.id, piece: 'cake' });
         return;
       }
@@ -894,6 +921,7 @@ export class Match {
     p.holder = r.id;
     p.vx = p.vy = p.vz = p.w = 0;
     r.held.push(p.id);
+    if (r.cfg.mods.mech === 'elevIntake') r.carriagePiece = p.id; // ground pickups go onto the elevator
     if (r.held.length >= F.MAX_HELD) r.intake = false;
     this.emit({ type: 'intake', robot: r.id, piece: p.type });
   }

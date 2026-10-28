@@ -211,7 +211,7 @@ export class RobotView {
     if (!c.mods?.ground) this.roller.visible = false; // no ground intake fitted
 
     // separate hopper: a low bin behind the elevator that holds pieces until the carriage reloads
-    this.separate = c.mods?.mech === 'separate' || opposite;
+    this.separate = c.mods?.mech === 'separate' || opposite || c.mods?.mech === 'elevIntake';
     this.hopperX = opposite ? 0.06 : ex - 0.12;
     if (this.separate) {
       const binM = mat(0x3a4250, { metalness: 0.3, transparent: true, opacity: 0.85 });

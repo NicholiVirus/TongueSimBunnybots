@@ -170,6 +170,27 @@ test('team 612 freezes robots it hits for 5 s', () => {
   assert.ok(b.x - x0 > 0.3, 'moves again after 5 s');
 });
 
+test('team 526 is locked to an L1 ground-intake elevator plus a depot/ramp-only hopper', () => {
+  const m = new Match({ slots: [{ id: 'a', alliance: 'red', station: 1, robot: 'team', team: '526', mods: { maxLevel: 3, mech: 'passthrough' } }], preload: 0 });
+  const r = m.robots[0];
+  assert.equal(r.cfg.mods.maxLevel, 1);
+  assert.equal(r.cfg.mods.mech, 'elevIntake');
+  while (m.phase === 'countdown') m.step();
+  // ground pickup goes onto the elevator; a second one is refused while it's full
+  const put = () => m.addPiece('carrot', r.x + Math.cos(r.th) * (r.cfg.length / 2 + 0.1), r.y + Math.sin(r.th) * (r.cfg.length / 2 + 0.1), r.th + Math.PI / 2, 'floor');
+  const c1 = put();
+  m.setInput('a', { intake: true });
+  for (let i = 0; i < 5; i++) m.step();
+  assert.equal(c1.st, 'held');
+  assert.equal(r.carriagePiece, c1.id);
+  const c2 = put();
+  for (let i = 0; i < 10; i++) m.step();
+  assert.equal(c2.st, 'floor', 'elevator holds one piece');
+  m.setInput('a', { sp: 'l2' });
+  m.step();
+  assert.notEqual(r.elevTarget, 'l2', 'L1 max');
+});
+
 function fullBotMatch() {
   const slots = [];
   for (const alliance of ['red', 'blue']) for (const station of [1, 2, 3]) slots.push({ id: `${alliance}${station}`, alliance, station, robot: ['team', 'speedy', 'tank'][station - 1], bot: true });
