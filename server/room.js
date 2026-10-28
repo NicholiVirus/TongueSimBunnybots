@@ -25,7 +25,7 @@ export class Room {
     this.bots = [];
     this.loop = null;
     this.lastResult = null;
-    this.settings = { autoRamp: false };
+    this.settings = { autoRamp: false, officialRules: false };
     this.createdAt = Date.now();
   }
 
@@ -113,7 +113,8 @@ export class Room {
       }
       case 'settings':
         if (!isHost || this.phase !== 'lobby') return;
-        this.settings.autoRamp = !!msg.autoRamp;
+        if ('autoRamp' in msg) this.settings.autoRamp = !!msg.autoRamp;
+        if ('officialRules' in msg) this.settings.officialRules = !!msg.officialRules;
         this.broadcastRoom();
         break;
       case 'fillBots':
@@ -172,7 +173,7 @@ export class Room {
       }
     }
     if (!slots.length) return this.sendError(this.players.get(this.host), 'Take a slot or add bots first');
-    this.match = new Match({ slots, autoRamp: this.settings.autoRamp });
+    this.match = new Match({ slots, autoRamp: this.settings.autoRamp, officialRules: this.settings.officialRules });
     this.match.bots = this.bots;
     this.phase = 'match';
     for (const p of this.players.values()) this.sendStart(p);

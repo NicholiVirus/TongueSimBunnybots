@@ -258,8 +258,12 @@ export class Match {
    * @param {object} opts
    * @param {Array<{id:string, alliance:'red'|'blue', station:number, robot:string, name?:string, team?:string, bot?:boolean}>} opts.slots
    */
-  constructor({ slots, preload = F.PRELOAD_PER_ROBOT, autoRamp = false } = {}) {
+  constructor({ slots, preload = F.PRELOAD_PER_ROBOT, autoRamp = false, officialRules = false } = {}) {
     this.autoRamp = autoRamp; // true: cakes roll down as soon as they're ready, caught or not
+    // official competition rules (manual v1.2) instead of the sim's house rules:
+    //  - traded oven carrots go to the OPPOSING depot (house: back to your own depot)
+    //  - no human-player actions during AUTO: no depot feeding, trades or ramp cakes (house: allowed)
+    this.officialRules = officialRules;
     this.time = 0; // seconds since the match was created
     this.phase = 'countdown';
     this.phaseTime = 0;
@@ -1047,7 +1051,7 @@ export class Match {
   }
 
   updateHumanPlayers(dt) {
-    const live = this.enabled;
+    const live = this.phase === 'teleop' || (this.phase === 'auto' && !this.officialRules);
     for (const a of F.ALLIANCES) {
       const inv = this.inv[a];
       // DEPOT: roll a carrot down whichever chute an alliance robot is waiting under
@@ -1083,12 +1087,13 @@ export class Match {
       });
 
       // RECIRCULATION: 3 oven carrots -> 1 carrot cake (carrots go to the opposing depot)
-      if (inv.ovenCarrots >= 3) {
+      if (inv.ovenCarrots >= 3 && (live || !this.officialRules)) {
         inv.tradeTimer += dt;
         if (inv.tradeTimer >= 1.5) {
           inv.tradeTimer = 0;
           inv.ovenCarrots -= 3;
-          inv.depotCarrots += 3; // house rule: the carrots go back to this alliance's own DEPOT (manual: opposing depot)
+          // house rule: carrots go back to this alliance's own DEPOT; official: to the opposing depot
+          this.inv[this.officialRules ? F.opponent(a) : a].depotCarrots += 3;
           if (inv.cakeBank > 0) {
             inv.cakeBank--;
             inv.rampCakes++;

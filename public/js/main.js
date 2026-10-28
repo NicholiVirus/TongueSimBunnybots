@@ -143,6 +143,7 @@ const actions = {
       opps: Number($('pr-opps').value),
       skill: Number($('pr-skill').value),
       autoRamp: $('pr-autoramp').checked,
+      officialRules: $('pr-official').checked,
       bots: structuredClone(practiceBots),
     });
   },
@@ -287,6 +288,7 @@ function applySettings() {
 applySettings();
 
 $('lobby-autoramp').addEventListener('change', (e) => net.send({ t: 'settings', autoRamp: e.target.checked }));
+$('lobby-official').addEventListener('change', (e) => net.send({ t: 'settings', officialRules: e.target.checked }));
 
 input.onChat = () => {
   if (!app.session || app.session.local) return;
@@ -443,6 +445,8 @@ function renderLobby(room) {
   const ar = $('lobby-autoramp');
   ar.checked = !!room.settings?.autoRamp;
   ar.disabled = !isHost;
+  $('lobby-official').checked = !!room.settings?.officialRules;
+  $('lobby-official').disabled = !isHost;
   $('lobby-specs').textContent = room.spectators.length ? room.spectators.map((s) => s.name).join(', ') : '—';
 }
 

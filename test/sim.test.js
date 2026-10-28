@@ -191,6 +191,33 @@ test('team 526 is locked to an L1 ground-intake elevator plus a depot/ramp-only 
   assert.notEqual(r.elevTarget, 'l2', 'L1 max');
 });
 
+test('official rules: oven carrots go to the opposing depot and human players sit out AUTO', () => {
+  const run = (officialRules) => {
+    const m = new Match({ slots: [{ id: 'a', alliance: 'red', station: 1, robot: 'team' }], preload: 0, officialRules });
+    const r = m.robots[0];
+    while (m.phase === 'countdown') m.step();
+    const red0 = m.inv.red.depotCarrots;
+    const blue0 = m.inv.blue.depotCarrots;
+    m.inv.red.ovenCarrots = 3;
+    // park under a red depot chute during AUTO
+    const c = F.depotChutes('red')[0];
+    r.x = c.x + c.dx * (r.cfg.length / 2 + 0.05);
+    r.y = c.y;
+    for (let i = 0; i < 60 * 3; i++) m.step();
+    const autoFed = r.held.length;
+    const traded = m.inv.red.ovenCarrots === 0;
+    while (m.phase === 'auto') m.step();
+    for (let i = 0; i < 60 * 2; i++) m.step();
+    return { autoFed, traded, red: m.inv.red.depotCarrots - red0, blue: m.inv.blue.depotCarrots - blue0 };
+  };
+  const house = run(false);
+  assert.ok(house.autoFed > 0 && house.traded, 'house rules: human players work in AUTO');
+  const off = run(true);
+  assert.equal(off.autoFed, 0, 'official: no depot feeding in AUTO');
+  assert.ok(!off.traded, 'official: no trade in AUTO');
+  assert.equal(off.blue, 3, 'official: traded carrots go to the opposing depot');
+});
+
 function fullBotMatch() {
   const slots = [];
   for (const alliance of ['red', 'blue']) for (const station of [1, 2, 3]) slots.push({ id: `${alliance}${station}`, alliance, station, robot: ['team', 'speedy', 'tank'][station - 1], bot: true });

@@ -94,6 +94,7 @@
             <select id="pr-skill"><option value="0.6">Rookie</option><option value="0.85" selected>Veteran</option><option value="1">Einstein</option></select>
           </label>
           <label class="check"><input type="checkbox" id="pr-autoramp" /> Auto-roll cakes down the ramp</label>
+          <label class="check" title="Oven carrots go to the OPPOSING depot, and human players can't act during AUTO (manual v1.2)"><input type="checkbox" id="pr-official" /> Official competition rules</label>
         </div>
         <p class="muted small">Off: cakes stay stored until a robot sits still at the bottom of its ramp for 1 s, then roll into it 0.5 s apart. On: they roll onto the field as soon as they're baked.</p>
         <div class="bot-head"><h3>Bot robots</h3><button class="btn tiny ghost" data-action="bots-random">🎲 Randomize all</button></div>
@@ -126,6 +127,7 @@
           <div class="spectators"><span class="muted small">SPECTATORS</span> <span id="lobby-specs">—</span> <button class="btn tiny ghost" data-action="spectate">Spectate</button></div>
           <div class="row">
             <label class="check"><input type="checkbox" id="lobby-autoramp" /> Auto-roll cakes</label>
+            <label class="check" title="Oven carrots go to the OPPOSING depot, and human players can't act during AUTO (manual v1.2)"><input type="checkbox" id="lobby-official" /> Official rules</label>
             <button class="btn ghost host-only" data-action="fill-bots">Fill with bots</button>
             <button class="btn primary host-only" data-action="start">Start Match</button>
             <span class="muted small guest-only">Waiting for host to start…</span>

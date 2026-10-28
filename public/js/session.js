@@ -68,8 +68,8 @@ const toSimInput = (i) => ({ seq: i.seq, mx: i.mx, my: i.my, rot: i.rot, intake:
 
 // ------------------------------------------------------------------ offline
 export class LocalSession {
-  constructor({ alliance = 'red', station = 2, robot = 'team', mods, name = 'You', team = '', allies = 2, opps = 3, skill = 0.85, autoRamp = false, bots }) {
-    this.opts = { alliance, station, robot, mods, name, team, allies, opps, skill, autoRamp, bots };
+  constructor({ alliance = 'red', station = 2, robot = 'team', mods, name = 'You', team = '', allies = 2, opps = 3, skill = 0.85, autoRamp = false, officialRules = false, bots }) {
+    this.opts = { alliance, station, robot, mods, name, team, allies, opps, skill, autoRamp, officialRules, bots };
     this.local = true;
     this.reset();
   }
@@ -92,7 +92,7 @@ export class LocalSession {
       slots.push({ id: `${other}${s}`, alliance: other, station: s, robot: c.robot, mods: c.mods, name: `Bot ${s}`, team: String(900 + s), bot: true });
     });
     this.you = slots[0].id;
-    this.match = new Match({ slots, autoRamp: this.opts.autoRamp });
+    this.match = new Match({ slots, autoRamp: this.opts.autoRamp, officialRules: this.opts.officialRules });
     this.bots = slots.filter((s) => s.bot).map((s) => new Bot(s.id, { skill }));
     this.match.bots = this.bots;
     this.roster = this.match.roster();
