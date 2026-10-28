@@ -316,6 +316,7 @@ export class Bot {
     }
     if (t.kind === 'depot') {
       inp.sp = 'stow';
+      if (t.floor) inp.intake = remaining < 0.4;
       if (r.held.length >= F.MAX_HELD || m.inv[r.alliance].depotCarrots <= 0) t.done = true;
       if (remaining < 0.15) {
         inp.mx *= 0.3;
@@ -415,13 +416,14 @@ export class Bot {
       if (t) return t;
     }
 
-    if (r.held.length < F.MAX_HELD && r.cfg.mods.ground) {
+    if (r.held.length < F.MAX_HELD) {
       // closest loose piece we may legally chase
       let best = null;
       let bd = Infinity;
       const oppK = F.kitchenPoly(F.opponent(a));
       const oppF = F.farmPoly(F.opponent(a));
       for (const p of m.pieces) {
+        if (!r.cfg.mods.ground) break; // no floor intake: depot / ramp only
         if (p.st !== 'floor' && p.st !== 'table') continue;
         if (p.st === 'table' && p.x * s < 0) continue;
         if (auto && p.x * s < 0.3) continue;
@@ -439,7 +441,7 @@ export class Bot {
         }
       }
       // DEPOT run when nothing is close
-      const depotT = r.cfg.mods.depot && m.inv[a].depotCarrots > 0 && !auto && m.timeLeft > F.TIMING.endgame + 10 ? this.depotTask(m, r) : null;
+      const depotT = (r.cfg.mods.depot || r.cfg.mods.ground) && m.inv[a].depotCarrots > 0 && !auto && m.timeLeft > F.TIMING.endgame + 10 ? this.depotTask(m, r) : null;
       const depotD = depotT ? Math.hypot(depotT.goal[0] - r.x, depotT.goal[1] - r.y) : Infinity;
       if (best && bd < depotD + 1.5) {
         // approach so the roller lines up with the piece axis — pick the side that keeps us out of opponent zones
@@ -474,7 +476,9 @@ export class Bot {
       if (depotT) return depotT;
     }
     if (r.held.length) return this.scoreTask(m, r);
-    // nothing to do: wait near midfield on our side
+    // nothing else to do: grab whatever cakes are stored, else wait near midfield on our side
+    const anyRamp = r.held.length === 0 ? this.rampTask(m, r, true) : null;
+    if (anyRamp) return anyRamp;
     return { kind: 'idle', goal: [s * 3.2, 0.5 * (r.station - 2)], since: m.time };
   }
 
@@ -506,14 +510,14 @@ export class Bot {
     return (m.bots || []).some((b) => b !== this && b.task && b.task.pieceId === pid && m.robotById(b.id)?.alliance === r.alliance);
   }
 
-  rampTask(m, r) {
+  rampTask(m, r, anyAmount = false) {
     const a = r.alliance;
     const inv = m.inv[a];
     if (m.autoRamp || !r.cfg.mods.ramp || inv.rampCakes <= 0 || m.phase === 'auto') return null;
     // let cakes stock up and grab a full load of 3; take them one by one only when no more are
     // coming (no trades left / pending) or time is getting short
     const moreComing = inv.cakeBank > 0 || inv.ovenCarrots > 0;
-    if (inv.rampCakes < F.MAX_HELD && moreComing && m.timeLeft > 50) return null;
+    if (!anyAmount && inv.rampCakes < F.MAX_HELD && moreComing && m.timeLeft > 50) return null;
     if ((m.bots || []).some((b) => b !== this && b.task?.kind === 'ramp' && m.robotById(b.id)?.alliance === a)) return null;
     if (![0, 1, 2].some((l) => shelfFit(m.shelfXs(a, l), 0, a) !== null)) return null;
     const s = F.sideSign(a);
@@ -526,7 +530,10 @@ export class Bot {
   depotTask(m, r) {
     const chutes = F.depotChutes(r.alliance);
     const c = chutes[r.station === 2 ? 1 : 0];
-    const off = r.cfg.length / 2 + 0.05;
+    // depot intake: park under the mouth. Ground intake only: wait out front, facing the chute,
+    // and intake the carrot the human player rolls onto the carpet
+    const catchIt = r.cfg.mods.depot;
+    const off = r.cfg.length / 2 + (catchIt ? 0.05 : 1.25);
     const gx = c.x + c.dx * off;
     const gy = c.y + c.dy * off;
     return {
@@ -534,7 +541,8 @@ export class Bot {
       goal: [gx, gy],
       stage: [gx + c.dx * 0.6, gy + c.dy * 0.6],
       direct: true,
-      heading: Math.atan2(c.dy, c.dx),
+      heading: catchIt ? Math.atan2(c.dy, c.dx) : Math.atan2(-c.dy, -c.dx),
+      floor: !catchIt,
       since: m.time,
     };
   }
@@ -571,7 +579,11 @@ export class Bot {
       };
     }
     // pantry full and holding a cake: worth more as HARVEST HAUL (3) than in the oven (1)
-    if (!heldTypes.includes('carrot')) return { ...this.parkSpot(r), kind: 'park', since: m.time };
+    if (!heldTypes.includes('carrot')) {
+      // only cakes aboard and no shelf we can reach: hold them for HARVEST HAUL near the end,
+      // otherwise send them through the oven so they come back down the ramp for a partner
+      if (m.timeLeft < 35) return { ...this.parkSpot(r), kind: 'park', since: m.time };
+    }
     // carrots -> OVEN through the kitchen-side mouth
     const gx = s * ((F.OVEN.mouthX0 + F.OVEN.mouthX1) / 2 + 0.05);
     const gy = F.OVEN.y1 + half + 0.02;

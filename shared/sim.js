@@ -921,6 +921,14 @@ export class Match {
     return Math.abs(r.x - tx) < 0.4 && Math.abs(r.y - F.OVEN.yc) < 0.35;
   }
 
+  waitingForRoll(r, c) {
+    const tx = c.x + c.dx * (r.cfg.length / 2 + 1.25);
+    const ty = c.y + c.dy * (r.cfg.length / 2 + 1.25);
+    if (Math.hypot(r.x - tx, r.y - ty) > 0.7) return false;
+    // don't pile up carrots: wait until the last one has been picked up
+    return !this.pieces.some((p) => p.type === 'carrot' && (p.st === 'floor' || p.st === 'chute') && Math.hypot(p.x - c.x, p.y - c.y) < 2.2);
+  }
+
   inCatchZone(r, chute) {
     // robot's bumper must be right under the 23" depot ramp mouth
     const off = r.cfg.length / 2 + 0.05;
@@ -938,7 +946,14 @@ export class Match {
       F.depotChutes(a).forEach((c, ci) => {
         inv.chuteTimers[ci] = Math.max(0, inv.chuteTimers[ci] - dt);
         if (!live || inv.chuteTimers[ci] > 0 || inv.depotCarrots <= 0) return;
-        const r = this.robots.find((q) => q.alliance === a && q.cfg.mods.depot && q.held.length + this.incoming(q) < F.MAX_HELD && this.inCatchZone(q, c));
+        // depot-intake robots catch straight from the mouth; ground-intake-only robots waiting out front
+        // get the carrot rolled onto the carpet toward them (one at a time)
+        const r = this.robots.find(
+          (q) =>
+            q.alliance === a &&
+            q.held.length + this.incoming(q) < F.MAX_HELD &&
+            ((q.cfg.mods.depot && this.inCatchZone(q, c)) || (!q.cfg.mods.depot && q.cfg.mods.ground && this.waitingForRoll(q, c))),
+        );
         if (!r) return;
         inv.depotCarrots--;
         inv.chuteTimers[ci] = 0.9;
@@ -951,10 +966,10 @@ export class Match {
           fy: p.y,
           fz: p.z,
           fth: p.th,
-          to: { x: hp.x, y: hp.y, z: Math.max(hp.z, 0.4), th: hp.th },
+          to: r.cfg.mods.depot ? { x: hp.x, y: hp.y, z: Math.max(hp.z, 0.4), th: hp.th } : { x: c.x, y: c.y, z: F.DEPOT.mouthZ, th: p.th },
           t: 0,
           dur: 0.45,
-          robot: r.id,
+          robot: r.cfg.mods.depot ? r.id : null,
           chute: c,
         };
       });

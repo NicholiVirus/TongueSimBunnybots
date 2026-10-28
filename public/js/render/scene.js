@@ -244,13 +244,6 @@ export class SceneView {
         this.chaseYaw = k > 1 ? yaw : dampAngle(this.chaseYaw, yaw, 10, dt);
         const back = 3.1;
         pos = new THREE.Vector3(me.x - Math.cos(this.chaseYaw) * back, 2.35 + me.elev * 0.3, -(me.y - Math.sin(this.chaseYaw) * back));
-        // keep the camera inside the field walls; rise up instead of going behind the alliance wall
-        const lx = F.FIELD.halfL - 0.2;
-        const ly = F.FIELD.halfW - 0.2;
-        const over = Math.max(Math.abs(pos.x) - lx, Math.abs(pos.z) - ly, 0);
-        pos.x = Math.max(-lx, Math.min(lx, pos.x));
-        pos.z = Math.max(-ly, Math.min(ly, pos.z));
-        pos.y += over * 0.9;
         look = new THREE.Vector3(me.x + Math.cos(this.chaseYaw) * 2.2, 0.35, -(me.y + Math.sin(this.chaseYaw) * 2.2));
         break;
       }
