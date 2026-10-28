@@ -4,7 +4,7 @@
 
 import { Match, TICK, driveStep, collideRobotStatic, assistInput } from '/shared/sim.js';
 import { Bot } from '/shared/bot.js';
-import { getRobotConfig } from '/shared/robots.js';
+import { getRobotConfig, randomMods } from '/shared/robots.js';
 
 const lerp = (a, b, t) => a + (b - a) * t;
 const lerpAngle = (a, b, t) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * t;
@@ -68,8 +68,8 @@ const toSimInput = (i) => ({ seq: i.seq, mx: i.mx, my: i.my, rot: i.rot, intake:
 
 // ------------------------------------------------------------------ offline
 export class LocalSession {
-  constructor({ alliance = 'red', station = 2, robot = 'team', mods, name = 'You', team = '', allies = 2, opps = 3, skill = 0.85, autoRamp = false }) {
-    this.opts = { alliance, station, robot, mods, name, team, allies, opps, skill, autoRamp };
+  constructor({ alliance = 'red', station = 2, robot = 'team', mods, name = 'You', team = '', allies = 2, opps = 3, skill = 0.85, autoRamp = false, bots }) {
+    this.opts = { alliance, station, robot, mods, name, team, allies, opps, skill, autoRamp, bots };
     this.local = true;
     this.reset();
   }
@@ -80,8 +80,17 @@ export class LocalSession {
     const slots = [{ id: `${alliance}${station}`, alliance, station, robot, mods, name, team }];
     const pool = ['team', 'speedy', 'tank'];
     const allyStations = [1, 2, 3].filter((s) => s !== station).slice(0, allies);
-    allyStations.forEach((s, i) => slots.push({ id: `${alliance}${s}`, alliance, station: s, robot: pool[(i + 1) % 3], name: `Bot ${s}`, team: String(100 + s), bot: true }));
-    [2, 1, 3].slice(0, opps).forEach((s, i) => slots.push({ id: `${other}${s}`, alliance: other, station: s, robot: pool[i % 3], name: `Bot ${s}`, team: String(900 + s), bot: true }));
+    // per-bot robot + mechanisms from the practice menu; anything unset gets a random build (kept across restarts)
+    const bots = (this.opts.bots ??= { ally: [], opp: [] });
+    const cfg = (list, i, robot) => (list[i] ??= { robot, mods: randomMods() });
+    allyStations.forEach((s, i) => {
+      const c = cfg(bots.ally, i, pool[(i + 1) % 3]);
+      slots.push({ id: `${alliance}${s}`, alliance, station: s, robot: c.robot, mods: c.mods, name: `Bot ${s}`, team: String(100 + s), bot: true });
+    });
+    [2, 1, 3].slice(0, opps).forEach((s, i) => {
+      const c = cfg(bots.opp, i, pool[i % 3]);
+      slots.push({ id: `${other}${s}`, alliance: other, station: s, robot: c.robot, mods: c.mods, name: `Bot ${s}`, team: String(900 + s), bot: true });
+    });
     this.you = slots[0].id;
     this.match = new Match({ slots, autoRamp: this.opts.autoRamp });
     this.bots = slots.filter((s) => s.bot).map((s) => new Bot(s.id, { skill }));

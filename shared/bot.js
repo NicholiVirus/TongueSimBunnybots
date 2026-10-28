@@ -3,6 +3,7 @@
 
 import * as F from './field.js';
 import { shelfFit } from './sim.js';
+import { isOneAtATime, shelfSide } from './robots.js';
 
 const CELL = 0.2;
 const NX = Math.ceil((F.FIELD.halfL * 2) / CELL);
@@ -290,7 +291,7 @@ export class Bot {
     this.keepOutOfOpponentZones(r, inp);
 
     // task actions
-    if (t.sp && remaining < 1.6) inp.sp = r.cfg.mods.mech === 'separate' && t.kind === 'pantry' && !r.carriage ? 'stow' : t.sp; // separate elevator reloads low
+    if (t.sp && remaining < 1.6) inp.sp = isOneAtATime(r.cfg.mods) && t.kind === 'pantry' && !r.carriage ? 'stow' : t.sp; // separate elevator reloads low
     if (t.kind === 'collect' || t.kind === 'table') {
       inp.intake = remaining < 1.5;
       inp.sp = 'stow';
@@ -563,7 +564,7 @@ export class Bot {
         goal: [gx, gy],
         stage: [gx, gy - 0.7],
         direct: true,
-        heading: Math.PI / 2,
+        heading: shelfSide(r.cfg.mods) > 0 ? Math.PI / 2 : -Math.PI / 2, // back to the shelves for elevator-back robots
         sp: ['l1', 'l2', 'l3'][level],
         heldAtStart: r.held.length,
         since: m.time,

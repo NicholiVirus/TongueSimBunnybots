@@ -127,7 +127,10 @@ export class RobotView {
     // elevator (2 stages + carriage)
     const e = c.elevator;
     const h1 = Math.max(0.6, e.max * 0.62);
-    const ex = -0.12;
+    // elevator sits just behind center, or at the very back for a hopper-front / elevator-back robot
+    const opposite = c.mods?.mech === 'opposite';
+    const ex = opposite ? -(fl / 2 - 0.1) : -0.12;
+    this.ex = ex;
     const rz = fw / 2 - 0.1;
     for (const z of [rz, -rz]) tube(0.04, h1, 0.04, ex, 0.11 + h1 / 2, z);
     tube(0.04, 0.04, 2 * rz + 0.04, ex, 0.11 + h1, 0);
@@ -194,13 +197,15 @@ export class RobotView {
     if (!c.mods?.ground) this.roller.visible = false; // no ground intake fitted
 
     // separate hopper: a low bin behind the elevator that holds pieces until the carriage reloads
-    this.separate = c.mods?.mech === 'separate';
+    this.separate = c.mods?.mech === 'separate' || opposite;
+    this.hopperX = opposite ? 0.06 : ex - 0.12;
     if (this.separate) {
       const binM = mat(0x3a4250, { metalness: 0.3, transparent: true, opacity: 0.85 });
       const len = F.PIECE.length + 0.08;
-      tube(0.36, 0.012, len, ex - 0.12, 0.13, 0, binM);
-      for (const z of [len / 2, -len / 2]) tube(0.36, 0.2, 0.012, ex - 0.12, 0.23, z, binM);
-      tube(0.012, 0.2, len, ex - 0.3, 0.23, 0, binM);
+      const hx = this.hopperX;
+      tube(0.36, 0.012, len, hx, 0.13, 0, binM);
+      for (const z of [len / 2, -len / 2]) tube(0.36, 0.2, 0.012, hx, 0.23, z, binM);
+      tube(0.012, 0.2, len, hx - 0.18, 0.23, 0, binM);
     }
 
     // "CAD goes here" badge on the elevator cross-bar
@@ -298,8 +303,8 @@ export class RobotView {
       pair.c.visible = t === 'c';
       pair.k.visible = t === 'k';
       const m = t === 'k' ? pair.k : pair.c;
-      if (i < onCarriage) m.position.set(-0.12, st.elev + i * 0.16 + F.PIECE.radius + 0.01, 0);
-      else m.position.set(-0.24, 0.14 + (i - onCarriage) * 0.16 + F.PIECE.radius, 0);
+      if (i < onCarriage) m.position.set(this.ex ?? -0.12, st.elev + i * 0.16 + F.PIECE.radius + 0.01, 0);
+      else m.position.set(this.hopperX ?? -0.24, 0.14 + (i - onCarriage) * 0.16 + F.PIECE.radius, 0);
     }
   }
 

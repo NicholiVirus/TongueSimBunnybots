@@ -25,8 +25,8 @@ test('cakes stay stored on the ramp until a robot waits at the bottom', () => {
   r.x = F.OVEN.x0 - r.cfg.length / 2 - 0.05;
   r.y = F.OVEN.yc;
   r.th = 0;
-  for (let i = 0; i < 60 * 2.9; i++) m.step();
-  assert.equal(m.inv.red.rampCakes, 2, 'nothing rolls until the robot has waited 3 s');
+  for (let i = 0; i < 60 * 0.9; i++) m.step();
+  assert.equal(m.inv.red.rampCakes, 2, 'nothing rolls until the robot has waited 1 s');
   for (let i = 0; i < 60 * 3.5; i++) m.step();
   assert.equal(m.inv.red.rampCakes, 0);
   assert.equal(r.held.length, 2, 'both cakes rolled straight into the waiting robot, 0.5 s apart');
@@ -89,6 +89,30 @@ test('robot mechanism options are enforced', () => {
   for (let i = 0; i < 60 * 3; i++) m.step();
   assert.equal(b.held.length, 0, 'reloaded at the bottom, went back to L3 and scored again');
   assert.equal(m.score.red.pantry[2].carrot, 2);
+});
+
+test('elevator-back robots score with their back to the pantry; depot auto-align', async () => {
+  const { alignTarget } = await import('../shared/sim.js');
+  const m = new Match({ slots: [{ id: 'a', alliance: 'red', station: 1, robot: 'team', mods: { mech: 'opposite' } }] });
+  const r = m.robots[0];
+  while (m.phase === 'countdown') m.step();
+  r.x = F.pantrySlotX(2, 1);
+  r.y = F.PANTRY.yFront - r.cfg.length / 2;
+  r.th = Math.PI / 2; // facing the shelves = elevator facing away
+  for (let i = 0; i < 40; i++) m.step();
+  m.setInput('a', { sp: 'l2' });
+  for (let i = 0; i < 60; i++) m.step();
+  m.setInput('a', { score: true });
+  m.step();
+  assert.equal(r.held.length, 2, 'front-facing: no score');
+  r.th = -Math.PI / 2; // back to the shelves
+  m.step();
+  assert.equal(r.held.length, 1, 'back-facing: scores');
+  // standing in our FARM near a depot chute, align targets the depot
+  const c = F.depotChutes('red')[0];
+  r.x = c.x + c.dx * 1.2;
+  r.y = c.y;
+  assert.equal(alignTarget(r, 'red').kind, 'depot');
 });
 
 function fullBotMatch() {

@@ -161,8 +161,10 @@ export class Hud {
       `<span>CAM: ${ctx.camName}</span>`,
       `<span class="${me.flags & 2 ? 'on' : ''}">TAXI ${me.flags & 2 ? '✓' : '·'}</span>`,
       `<span class="${me.flags & 1 ? 'on' : ''}">INTAKE</span>`,
-      cfg.mods?.mech === 'separate' && held.length ? `<span class="${me.flags & 8 ? 'on' : ''}">CARRIAGE ${me.flags & 8 ? 'LOADED' : 'reloading — stow'}</span>` : '',
-      me.rampWait > 0 ? `<span class="on">RAMP ${me.rampWait >= 3 ? 'CATCHING' : `hold still ${(3 - me.rampWait).toFixed(1)}s`}</span>` : '',
+      (cfg.mods?.mech === 'separate' || cfg.mods?.mech === 'opposite') && held.length
+        ? `<span class="${me.flags & 8 ? 'on' : ''}">CARRIAGE ${me.flags & 8 ? 'LOADED' : 'reloading — stow'}</span>`
+        : '',
+      me.rampWait > 0 ? `<span class="on">RAMP ${me.rampWait >= 1 ? 'CATCHING' : `hold still ${(1 - me.rampWait).toFixed(1)}s`}</span>` : '',
     ].join('');
     this.setHTML('rs-tags', tags);
   }

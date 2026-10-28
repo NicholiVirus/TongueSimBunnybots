@@ -78,8 +78,26 @@ export const ROBOT_IDS = Object.keys(ROBOTS);
 //   mech     — 'passthrough': pieces feed straight into the elevator carriage (all ride up together)
 //              'separate'   : pieces wait in a low hopper; the elevator carries ONE piece per trip and
 //                             reloads at the bottom (~0.45 s), but the robot stays stable when raised
+//              'opposite'   : hopper + ground intake on the FRONT, elevator on the BACK — like 'separate',
+//                             but the robot scores on the shelves with its back to the pantry
 export const DEFAULT_MODS = { ground: true, depot: true, ramp: true, maxLevel: 3, mech: 'passthrough' };
-export const MECHS = { passthrough: 'Passthrough elevator', separate: 'Hopper + separate elevator' };
+export const MECHS = { passthrough: 'Passthrough elevator', separate: 'Hopper + separate elevator', opposite: 'Hopper front + elevator back' };
+// one piece per lift, reloaded from a hopper
+export const isOneAtATime = (mods) => mods?.mech === 'separate' || mods?.mech === 'opposite';
+// which way the robot faces the PANTRY: +1 front, -1 back
+export const shelfSide = (mods) => (mods?.mech === 'opposite' ? -1 : 1);
+
+// random but sensible mechanisms for practice bots (always some way to get pieces)
+export function randomMods(rand = Math.random) {
+  const ground = rand() < 0.8;
+  return {
+    ground,
+    depot: !ground || rand() < 0.7,
+    ramp: rand() < 0.75,
+    maxLevel: [1, 2, 2, 3, 3, 3][Math.floor(rand() * 6)],
+    mech: ['passthrough', 'separate', 'opposite'][Math.floor(rand() * 3)],
+  };
+}
 export const LEVEL_NAMES = ['OVEN only', 'LEVEL 1', 'LEVEL 2', 'LEVEL 3'];
 
 export function sanitizeMods(m) {
@@ -98,7 +116,7 @@ export function sanitizeMods(m) {
 export function modsLabel(m) {
   const md = sanitizeMods(m);
   const intakes = [md.ground && 'Ground', md.depot && 'Depot', md.ramp && 'Ramp'].filter(Boolean).join('/') || 'No intake';
-  return `${intakes} · ${md.maxLevel ? 'L' + md.maxLevel : 'Oven'} · ${md.mech === 'separate' ? 'Hopper+Elev' : 'Passthrough'}`;
+  return `${intakes} · ${md.maxLevel ? 'L' + md.maxLevel : 'Oven'} · ${{ passthrough: 'Passthrough', separate: 'Hopper+Elev', opposite: 'Hopper|Elev opposite' }[md.mech]}`;
 }
 
 const cfgCache = new Map();

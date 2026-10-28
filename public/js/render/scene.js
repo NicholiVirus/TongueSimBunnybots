@@ -147,6 +147,7 @@ export class SceneView {
     const me = roster.find((r) => r.id === you);
     this.alliance = me?.alliance || 'red';
     this.station = me?.station || 2;
+    this.camFlip = me?.mods?.mech === 'opposite' ? Math.PI : 0;
     for (const info of roster) {
       const rv = new RobotView(info, getRobotConfig(info.robot, info.mods));
       if (info.id === you) rv.label.visible = false;
@@ -238,9 +239,18 @@ export class SceneView {
       }
       case 'chase': {
         if (!me) break;
-        this.chaseYaw = k > 1 ? me.th : dampAngle(this.chaseYaw, me.th, 10, dt);
+        // camera sits opposite the scoring side (in front of an elevator-back robot)
+        const yaw = me.th + (this.camFlip || 0);
+        this.chaseYaw = k > 1 ? yaw : dampAngle(this.chaseYaw, yaw, 10, dt);
         const back = 3.1;
         pos = new THREE.Vector3(me.x - Math.cos(this.chaseYaw) * back, 2.35 + me.elev * 0.3, -(me.y - Math.sin(this.chaseYaw) * back));
+        // keep the camera inside the field walls; rise up instead of going behind the alliance wall
+        const lx = F.FIELD.halfL - 0.2;
+        const ly = F.FIELD.halfW - 0.2;
+        const over = Math.max(Math.abs(pos.x) - lx, Math.abs(pos.z) - ly, 0);
+        pos.x = Math.max(-lx, Math.min(lx, pos.x));
+        pos.z = Math.max(-ly, Math.min(ly, pos.z));
+        pos.y += over * 0.9;
         look = new THREE.Vector3(me.x + Math.cos(this.chaseYaw) * 2.2, 0.35, -(me.y + Math.sin(this.chaseYaw) * 2.2));
         break;
       }

@@ -2,7 +2,7 @@
 // (online play) and in the browser (offline practice). Fixed 60 Hz step.
 
 import * as F from './field.js';
-import { getRobotConfig } from './robots.js';
+import { getRobotConfig, isOneAtATime, shelfSide } from './robots.js';
 
 export const TICK = 1 / 60;
 
@@ -13,7 +13,7 @@ const PIECE_I = PIECE.length ** 2 / 12 + PR ** 2 / 4; // inertia / mass
 const GRAV = 9.81;
 const HOLD_SPACING = 0.16;
 export const LOAD_TIME = 0.45; // s for a separate elevator to take a piece from the hopper
-export const RAMP_WAIT = 3; // s a robot must sit at the foot of the ramp before cakes roll
+export const RAMP_WAIT = 1; // s a robot must sit at the foot of the ramp before cakes roll
 export const RAMP_GAP = 0.5; // s between cakes rolling down
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -132,7 +132,7 @@ export function driveStep(r, inp, dt, enabled = true) {
   // tall elevator = slower, gentler driving
   const e = c.elevator;
   // a separate elevator lifts one piece; a passthrough lifts the whole load (more top-heavy)
-  const tall = clamp((r.elev - e.min) / Math.max(0.3, e.max - e.min), 0, 1) * (c.mods?.mech === 'separate' ? 0.5 : 1);
+  const tall = clamp((r.elev - e.min) / Math.max(0.3, e.max - e.min), 0, 1) * (isOneAtATime(c.mods) ? 0.5 : 1);
   const vmax = c.maxSpeed * (1 - 0.45 * tall);
   const acc = c.accel * (1 - 0.35 * tall) * (enabled ? 1 : 1.6);
   const tvx = mx * vmax;
@@ -165,10 +165,12 @@ export function alignTarget(r, alliance) {
   const ob = F.ovenBox(alliance);
   const mouthX = (s * (F.OVEN.mouthX0 + F.OVEN.mouthX1)) / 2;
   const cands = [
-    { kind: 'pantry', x: clamp(r.x, pb.x0 + 0.2, pb.x1 - 0.2), y: F.PANTRY.yFront - half - 0.01, th: Math.PI / 2 },
+    { kind: 'pantry', x: clamp(r.x, pb.x0 + 0.2, pb.x1 - 0.2), y: F.PANTRY.yFront - half - 0.01, th: shelfSide(r.cfg.mods) > 0 ? Math.PI / 2 : -Math.PI / 2 },
     { kind: 'oven', x: mouthX, y: ob.y1 + half + 0.02, th: -Math.PI / 2 },
     { kind: 'oven', x: mouthX, y: ob.y0 - half - 0.02, th: Math.PI / 2 },
     { kind: 'oven', x: s > 0 ? ob.x0 - half - 0.02 : ob.x1 + half + 0.02, y: F.OVEN.yc, th: s > 0 ? 0 : Math.PI },
+    // DEPOT chutes in our FARM: park right under the 23" mouth, hopper toward the wall
+    ...F.depotChutes(alliance).map((c) => ({ kind: 'depot', x: c.x + c.dx * (half + 0.05), y: c.y + c.dy * (half + 0.05), th: Math.atan2(-c.dy, -c.dx) })),
   ];
   let best = null;
   let bd = 2.6;
@@ -423,7 +425,7 @@ export class Match {
     if (en && inp.intake && !mods.ground) this.denied(r, 'This robot has no ground intake — use the DEPOT or RAMP');
 
     // separate hopper + elevator: the carriage carries one piece and reloads at the bottom
-    if (mods.mech === 'separate') {
+    if (isOneAtATime(mods)) {
       r.carriage = Math.min(r.carriage || 0, r.held.length);
       if (!r.carriage && r.held.length && r.elev <= e.min + 0.04) {
         r.loadT = (r.loadT || 0) + dt;
@@ -436,7 +438,7 @@ export class Match {
       } else r.loadT = 0;
     }
 
-    if (en && inp.align && !alignTarget(r, r.alliance)) this.denied(r, 'Nothing to align to — get near your PANTRY or OVEN');
+    if (en && inp.align && !alignTarget(r, r.alliance)) this.denied(r, 'Nothing to align to — get near your PANTRY, OVEN or DEPOT');
     driveStep(r, assistInput(r, inp, r.alliance), dt, en);
     collideRobotStatic(r);
 
@@ -507,25 +509,29 @@ export class Match {
 
     // ---- PANTRY (own alliance only — G16)
     const pb = F.pantryBox(a);
-    const facingPantry = fwdY > Math.cos((32 * Math.PI) / 180);
-    if (facingPantry && fy > F.PANTRY.yFront - 0.22 && fx > pb.x0 + 0.05 && fx < pb.x1 - 0.05) {
+    // the elevator side faces the shelves (the back, for a hopper-front / elevator-back robot)
+    const ss = shelfSide(r.cfg.mods);
+    const ex = r.x + fwdX * (r.cfg.length / 2) * ss;
+    const ey = r.y + fwdY * (r.cfg.length / 2) * ss;
+    const facingPantry = fwdY * ss > Math.cos((32 * Math.PI) / 180);
+    if (facingPantry && ey > F.PANTRY.yFront - 0.22 && ex > pb.x0 + 0.05 && ex < pb.x1 - 0.05) {
       let level = -1;
       // only score once the elevator has arrived at the shelf it was sent to (not while passing others)
       ['l1', 'l2', 'l3'].forEach((k, i) => {
         if (r.elevTarget === k && Math.abs(r.elev - e.setpoints[k]) <= e.tolerance) level = i;
       });
       if (level < 0) return this.denied(r, 'Raise the elevator to L1/L2/L3');
-      if (r.cfg.mods.mech === 'separate' && !r.carriage) return this.denied(r, 'Carriage empty — stow (R) to reload from the hopper');
+      if (isOneAtATime(r.cfg.mods) && !r.carriage) return this.denied(r, 'Carriage empty — stow (R) to reload from the hopper');
       const shelf = this.pantry[a][level];
       const xs = this.shelfXs(a, level);
-      if (shelfFit(xs, fx, a) === null) return this.denied(r, `LEVEL ${level + 1} is full`);
-      const px = shelfFit(xs, fx, a, 0.12);
+      if (shelfFit(xs, ex, a) === null) return this.denied(r, `LEVEL ${level + 1} is full`);
+      const px = shelfFit(xs, ex, a, 0.12);
       if (px === null) return this.denied(r, 'No room there — slide left/right to a gap');
       const p = this.popHeld(r, 'cake');
       shelf.push(p.id);
       const to = { x: px, y: (F.PANTRY.yFront + F.PANTRY.yBack) / 2 + 0.005, z: F.PANTRY.shelfZ[level], th: 0 };
       this.startPlace(p, r, to, 'pantry', 0.22);
-      if (r.cfg.mods.mech === 'separate') {
+      if (isOneAtATime(r.cfg.mods)) {
         r.carriage = 0;
         if (r.held.length && r.input.autoStow !== false) {
           r.returnTo = r.elevTarget; // drop to reload, then come back to this shelf

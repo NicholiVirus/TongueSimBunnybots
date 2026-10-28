@@ -1,5 +1,5 @@
 import { TICK } from '/shared/sim.js';
-import { ROBOTS, ROBOT_IDS, getRobotConfig, sanitizeMods, modsLabel } from '/shared/robots.js';
+import { ROBOTS, ROBOT_IDS, getRobotConfig, sanitizeMods, modsLabel, randomMods, MECHS } from '/shared/robots.js';
 import { SceneView } from './render/scene.js';
 import { Input } from './input.js';
 import { Hud, renderResults } from './hud.js';
@@ -110,7 +110,14 @@ document.addEventListener('click', (e) => {
 });
 
 const actions = {
-  practice: () => show('practice'),
+  practice: () => {
+    renderBotRows();
+    show('practice');
+  },
+  'bots-random': () => {
+    practiceBots = randomBots();
+    renderBotRows();
+  },
   back: () => show('menu'),
   'practice-start': () => {
     const p = profile();
@@ -125,6 +132,7 @@ const actions = {
       opps: Number($('pr-opps').value),
       skill: Number($('pr-skill').value),
       autoRamp: $('pr-autoramp').checked,
+      bots: structuredClone(practiceBots),
     });
   },
   quick: () => online({ t: 'quick' }),
@@ -177,6 +185,61 @@ const actions = {
   'remove-bot': (b) => net.send({ t: 'bot', slot: b.dataset.slot, add: false }),
   kick: (b) => net.send({ t: 'kick', pid: b.dataset.pid }),
 };
+
+// ------------------------------------------------------------------ practice bot builds
+const POOL = ['team', 'speedy', 'tank'];
+const randomBots = () => ({
+  ally: [0, 1].map(() => ({ robot: POOL[Math.floor(Math.random() * 3)], mods: randomMods() })),
+  opp: [0, 1, 2].map(() => ({ robot: POOL[Math.floor(Math.random() * 3)], mods: randomMods() })),
+});
+let practiceBots = randomBots();
+
+function renderBotRows() {
+  const box = $('pr-bots');
+  box.innerHTML = '';
+  const mine = $('pr-alliance').value;
+  const other = mine === 'red' ? 'blue' : 'red';
+  const rows = [
+    ...practiceBots.ally.slice(0, Number($('pr-allies').value)).map((b, i) => ({ b, label: `Partner ${i + 1}`, a: mine })),
+    ...practiceBots.opp.slice(0, Number($('pr-opps').value)).map((b, i) => ({ b, label: `Opponent ${i + 1}`, a: other })),
+  ];
+  if (!rows.length) box.innerHTML = '<p class="muted small">No bots — solo practice.</p>';
+  for (const { b, label, a } of rows) {
+    const md = sanitizeMods(b.mods);
+    const row = document.createElement('div');
+    row.className = `bot-row ${a}`;
+    const opt = (v, t, sel) => `<option value="${v}" ${sel ? 'selected' : ''}>${esc(t)}</option>`;
+    row.innerHTML = `
+      <div class="top"><b>${label}</b>
+        <select data-k="robot">${ROBOT_IDS.map((id) => opt(id, ROBOTS[id].name, id === b.robot)).join('')}</select>
+        <button class="btn tiny ghost" data-k="dice" title="Random build">🎲</button></div>
+      <details><summary>${esc(modsLabel(md))}</summary>
+        <div class="config-grid">
+          <label class="check"><input type="checkbox" data-k="ground" ${md.ground ? 'checked' : ''}/> Ground intake</label>
+          <label class="check"><input type="checkbox" data-k="depot" ${md.depot ? 'checked' : ''}/> Depot intake</label>
+          <label class="check"><input type="checkbox" data-k="ramp" ${md.ramp ? 'checked' : ''}/> Ramp intake</label>
+          <label>Highest shelf<select data-k="maxLevel">${['Oven only', 'LEVEL 1', 'LEVEL 2', 'LEVEL 3'].map((t, i) => opt(i, t, i === md.maxLevel)).join('')}</select></label>
+          <label class="wide">Mechanism<select data-k="mech">${Object.entries(MECHS)
+            .map(([k, t]) => opt(k, t, k === md.mech))
+            .join('')}</select></label>
+        </div></details>`;
+    row.addEventListener('change', (e) => {
+      const k = e.target.dataset.k;
+      if (k === 'robot') b.robot = e.target.value;
+      else if (k) b.mods = sanitizeMods({ ...md, [k]: e.target.type === 'checkbox' ? e.target.checked : k === 'maxLevel' ? Number(e.target.value) : e.target.value });
+      const open = row.querySelector('details').open;
+      renderBotRows();
+      if (open) box.children[rows.findIndex((r) => r.b === b)]?.querySelector('details')?.setAttribute('open', '');
+    });
+    row.querySelector('[data-k="dice"]').addEventListener('click', () => {
+      b.robot = POOL[Math.floor(Math.random() * 3)];
+      b.mods = randomMods();
+      renderBotRows();
+    });
+    box.appendChild(row);
+  }
+}
+for (const id of ['pr-alliance', 'pr-allies', 'pr-opps']) $(id).addEventListener('change', renderBotRows);
 
 function status(msg) {
   $('net-status').textContent = msg;

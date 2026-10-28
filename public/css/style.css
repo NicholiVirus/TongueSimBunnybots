@@ -912,3 +912,55 @@ ol.small li {
   font-size: 11px;
   color: var(--muted);
 }
+
+.bot-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 14px;
+}
+.bot-head h3 {
+  margin: 0;
+}
+.bot-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+.bot-row {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+.bot-row.red {
+  border-left: 3px solid var(--red);
+}
+.bot-row.blue {
+  border-left: 3px solid var(--blue);
+}
+.bot-row .top {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.bot-row .top b {
+  min-width: 82px;
+  font-size: 13px;
+}
+.bot-row .top select {
+  flex: 1;
+  padding: 5px 8px;
+  font-size: 13px;
+}
+.bot-row summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 6px;
+}
+.bot-row .config-grid select {
+  padding: 5px 8px;
+  font-size: 13px;
+}
