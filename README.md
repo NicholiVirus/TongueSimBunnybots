@@ -73,7 +73,6 @@ Auto-align (Space) also works at your **DEPOT** chutes: it parks you right under
 ## Team easter eggs
 
 - **Team 526** — locked build (the Mechanisms menu greys out): max **LEVEL 1**, the **elevator is the ground intake** (holds one piece and scores it on L1 or in the OVEN), and a separate **hopper fed only by the DEPOT/RAMP** that can only dump into the OVEN.
-- **Team 612** — any robot you bump is frozen for **5 s** (no driving, no mechanisms), then immune for 2 s.
 
 ## Your robot's CAD
 
