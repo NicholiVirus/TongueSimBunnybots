@@ -428,7 +428,7 @@ export class Match {
       if (r.team === TONGUE_TEAM) {
         r.tongue = !r.tongue;
         this.emit({ type: 'hint', robot: r.id, msg: r.tongue ? '👅 Tongue out — slide carrots with A/D' : 'Tongue in' });
-      } else this.denied(r, `Only team ${TONGUE_TEAM} has a tongue 👅`);
+      } // any other team: K does nothing and says nothing (it's a secret)
     }
     r.prevTongue = !!inp.tongue;
     if (en && inp.sp && e.setpoints[inp.sp] !== undefined && inp.sp !== r.elevTarget) {
