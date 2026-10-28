@@ -94,9 +94,13 @@
             <select id="pr-skill"><option value="0.6">Rookie</option><option value="0.85" selected>Veteran</option><option value="1">Einstein</option></select>
           </label>
           <label class="check"><input type="checkbox" id="pr-autoramp" /> Auto-roll cakes down the ramp</label>
-          <label class="check" title="Oven carrots go to the OPPOSING depot, and human players can't act during AUTO (manual v1.2)"><input type="checkbox" id="pr-official" /> Official competition rules</label>
         </div>
         <p class="muted small">Off: cakes stay stored until a robot sits still at the bottom of its ramp for 1 s, then roll into it 0.5 s apart. On: they roll onto the field as soon as they're baked.</p>
+        <label class="rule-box"><input type="checkbox" id="pr-official" />
+          <span><b>Official competition rules</b>
+            <span class="small">✔ No human player actions during AUTO (no depot carrots, trades or ramp cakes until TELEOP)<br />✔ Carrots you score in your OVEN go to the <b>other alliance's depot</b> (red oven → blue depot)<br />Unchecked: human players work in AUTO and oven carrots come back to your own depot.</span>
+          </span>
+        </label>
         <div class="bot-head"><h3>Bot robots</h3><button class="btn tiny ghost" data-action="bots-random">🎲 Randomize all</button></div>
         <div id="pr-bots" class="bot-list"></div>
         <div class="row end">
@@ -127,7 +131,7 @@
           <div class="spectators"><span class="muted small">SPECTATORS</span> <span id="lobby-specs">—</span> <button class="btn tiny ghost" data-action="spectate">Spectate</button></div>
           <div class="row">
             <label class="check"><input type="checkbox" id="lobby-autoramp" /> Auto-roll cakes</label>
-            <label class="check" title="Oven carrots go to the OPPOSING depot, and human players can't act during AUTO (manual v1.2)"><input type="checkbox" id="lobby-official" /> Official rules</label>
+            <label class="check" title="Checked: no human player actions during AUTO, and oven carrots go to the other alliance's depot (red oven → blue depot)"><input type="checkbox" id="lobby-official" /> Official rules (no HP in auto, oven carrots → other depot)</label>
             <button class="btn ghost host-only" data-action="fill-bots">Fill with bots</button>
             <button class="btn primary host-only" data-action="start">Start Match</button>
             <span class="muted small guest-only">Waiting for host to start…</span>
@@ -156,6 +160,7 @@
           <div class="sb-rp" id="rp-blue"></div>
         </div>
       </div>
+      <div class="rules-badge" id="rules-badge"></div>
       <div class="sb-inv">
         <div class="inv red" id="inv-red"></div>
         <div class="inv blue" id="inv-blue"></div>

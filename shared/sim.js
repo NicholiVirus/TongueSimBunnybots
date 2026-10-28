@@ -1093,12 +1093,13 @@ export class Match {
           inv.tradeTimer = 0;
           inv.ovenCarrots -= 3;
           // house rule: carrots go back to this alliance's own DEPOT; official: to the opposing depot
-          this.inv[this.officialRules ? F.opponent(a) : a].depotCarrots += 3;
+          const to = this.officialRules ? F.opponent(a) : a;
+          this.inv[to].depotCarrots += 3;
           if (inv.cakeBank > 0) {
             inv.cakeBank--;
             inv.rampCakes++;
-            this.emit({ type: 'trade', alliance: a, cake: true });
-          } else this.emit({ type: 'trade', alliance: a, cake: false });
+            this.emit({ type: 'trade', alliance: a, cake: true, to });
+          } else this.emit({ type: 'trade', alliance: a, cake: false, to });
         }
       } else inv.tradeTimer = 0;
 
@@ -1253,6 +1254,7 @@ export class Match {
     const held = (r) => r.held.map((id) => (this.pieces.find((p) => p.id === id).type === 'cake' ? 'k' : 'c')).join('');
     return {
       tk: this.tick,
+      or: this.officialRules ? 1 : 0,
       ph: this.phase,
       pt: r2(this.phaseTime),
       tl: r2(this.timeLeft),

@@ -65,6 +65,13 @@ export class Hud {
     this.hintT -= dt;
     if (this.hintT <= 0) $('hint').classList.remove('show');
 
+    const badge = s.or ? 'OFFICIAL RULES · no HP in AUTO · oven carrots → other depot' : 'HOUSE RULES · HP active in AUTO · oven carrots → own depot';
+    if (this.cache.badge !== badge) {
+      this.cache.badge = badge;
+      $('rules-badge').textContent = badge;
+      $('rules-badge').classList.toggle('official', !!s.or);
+    }
+
     // scoreboard
     this.setText('score-red', String(s.s.red.totals.total));
     this.setText('score-blue', String(s.s.blue.totals.total));

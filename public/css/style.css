@@ -548,7 +548,7 @@ body:not(.is-host) .host-only {
 }
 .toasts {
   position: absolute;
-  top: 116px;
+  top: 134px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -963,4 +963,55 @@ ol.small li {
 .bot-row .config-grid select {
   padding: 5px 8px;
   font-size: 13px;
+}
+
+.rule-box {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  align-items: flex-start;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 14px;
+  color: var(--text);
+  background: rgba(255, 216, 74, 0.08);
+  border: 1px solid rgba(255, 216, 74, 0.35);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-top: 6px;
+  cursor: pointer;
+}
+.rule-box input {
+  margin-top: 3px;
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+.rule-box > span {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.rule-box .small {
+  color: var(--muted);
+  line-height: 1.45;
+}
+.rules-badge {
+  position: absolute;
+  top: 112px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--body);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(8, 12, 20, 0.72);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.rules-badge.official {
+  background: #ffd84a;
+  color: #2a1d00;
+  font-weight: 700;
 }

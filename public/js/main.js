@@ -288,7 +288,17 @@ function applySettings() {
 applySettings();
 
 $('lobby-autoramp').addEventListener('change', (e) => net.send({ t: 'settings', autoRamp: e.target.checked }));
-$('lobby-official').addEventListener('change', (e) => net.send({ t: 'settings', officialRules: e.target.checked }));
+$('lobby-official').addEventListener('change', (e) => {
+  settings.officialRules = e.target.checked;
+  saveSettings();
+  net.send({ t: 'settings', officialRules: e.target.checked });
+});
+// remember the rules choice between matches
+$('pr-official').checked = !!settings.officialRules;
+$('pr-official').addEventListener('change', (e) => {
+  settings.officialRules = e.target.checked;
+  saveSettings();
+});
 
 input.onChat = () => {
   if (!app.session || app.session.local) return;
@@ -350,6 +360,7 @@ async function online(msg) {
   }
   net.send({ t: 'hello', ...profile() });
   net.send(msg);
+  if (msg.t === 'create' && settings.officialRules) net.send({ t: 'settings', officialRules: true }); // host's saved rules choice
   status('');
 }
 
@@ -525,7 +536,7 @@ function handleEvents(events) {
         if (e.robot === you) audio.intake();
         break;
       case 'trade':
-        if (e.cake) hud.toast(`${e.alliance.toUpperCase()} baked a CARROT CAKE!`, e.alliance);
+        hud.toast(`${e.alliance.toUpperCase()} oven: 3 carrots → ${e.to.toUpperCase()} depot${e.cake ? ' · CARROT CAKE baked!' : ''}`, e.alliance);
         break;
       case 'endgame':
         hud.banner('ENDGAME', '#ffd84a');
