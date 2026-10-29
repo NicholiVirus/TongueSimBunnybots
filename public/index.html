@@ -31,9 +31,14 @@
           </div>
         </div>
 
+        <div class="account-bar" id="account-bar">
+          <span id="account-who" class="muted small">Not logged in — guests can play everything except ranked runs</span>
+          <button class="btn tiny" data-action="account" id="account-btn">Log in / Register</button>
+        </div>
+
         <div class="profile">
           <label>Driver name<input id="in-name" maxlength="20" placeholder="Driver" /></label>
-          <label>Team #<input id="in-team" maxlength="5" inputmode="numeric" placeholder="709" /></label>
+          <label>Team #<input id="in-team" maxlength="5" inputmode="numeric" placeholder="611" /></label>
           <label class="wide">Robot<select id="in-robot"></select></label>
           <p id="robot-blurb" class="muted small"></p>
           <details class="config wide" id="cfg">
@@ -54,6 +59,7 @@
 
         <div class="menu-buttons">
           <button class="btn primary big" data-action="practice">Practice <small>offline · vs bots</small></button>
+          <button class="btn big ranked" data-action="ranked">🏆 Ranked Run <small>solo · leaderboard</small></button>
           <button class="btn big" data-action="quick">Quick Play <small>online</small></button>
           <div class="row">
             <button class="btn" data-action="create">Create Room</button>
@@ -68,6 +74,7 @@
             <button class="btn ghost" data-action="settings">Settings</button>
             <button class="btn ghost" data-action="rules">Game Rules</button>
           </div>
+          <button class="btn ghost" data-action="leaderboard">🏆 Leaderboard</button>
         </div>
         <div id="net-status" class="muted small"></div>
       </div>
@@ -211,6 +218,7 @@
         </div>
         <table class="breakdown" id="res-table"></table>
         <div class="res-rp" id="res-rp"></div>
+        <div class="res-ranked hidden" id="res-ranked"></div>
         <div class="row end">
           <button class="btn ghost" data-action="quit">Main Menu</button>
           <button class="btn primary" data-action="again">Play Again</button>
@@ -298,6 +306,30 @@
         </table>
       </div>
       <p class="small muted">Match: 15 s AUTO + 2:15 TELEOP (last 20 s = ENDGAME). 5 pieces per shelf, 3 pieces per robot (G14). Auto-called fouls: G11 contact in an opponent's KITCHEN/FARM, G12 TABLE ZONE protection in ENDGAME, G13 crossing the CENTER LINE in AUTO. Based on the Blair Bunnybots 2026 manual v1.2.</p>
+    </template>
+
+    <template id="tpl-account">
+      <h2>Driver account</h2>
+      <div class="tabs" id="acct-tabs">
+        <button class="tab on" data-mode="login">Log in</button>
+        <button class="tab" data-mode="register">Register</button>
+      </div>
+      <form class="acct-form" id="acct-form" autocomplete="on">
+        <label>Username<input name="username" maxlength="20" autocomplete="username" required /></label>
+        <label>Password<input name="password" type="password" maxlength="200" autocomplete="current-password" required /></label>
+        <label class="reg-only">Confirm password<input name="confirm" type="password" maxlength="200" autocomplete="new-password" /></label>
+        <label class="reg-only">Team #<input name="team" maxlength="5" inputmode="numeric" placeholder="611" /></label>
+        <p class="muted small reg-only">Usernames are 3–20 letters, numbers, _ or -. Passwords are stored hashed (never in plain text).</p>
+        <p class="acct-error" id="acct-error"></p>
+        <button class="btn primary" type="submit" id="acct-submit">Log in</button>
+      </form>
+    </template>
+
+    <template id="tpl-leaderboard">
+      <h2>🏆 Leaderboard</h2>
+      <p class="muted small">Only <b>Ranked Runs</b> count: a solo match run on the server — just your robot, no bots on either alliance, house rules. Each board keeps every driver's best score with that scoring mechanism; <b>Overall</b> shows each driver's best on any mechanism.</p>
+      <div class="tabs" id="lb-tabs"></div>
+      <div class="lb-wrap"><table class="keys lb" id="lb-table"></table></div>
     </template>
 
     <template id="tpl-settings">

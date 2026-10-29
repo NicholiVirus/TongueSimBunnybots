@@ -15,10 +15,12 @@ const clean = (s, n) =>
     .slice(0, n);
 
 export class Room {
-  constructor(code, { isPublic = true, onEmpty } = {}) {
+  constructor(code, { isPublic = true, ranked = false, onEmpty, onResult } = {}) {
     this.code = code;
     this.isPublic = isPublic;
+    this.ranked = ranked; // solo leaderboard run: nobody else joins, nothing can be changed
     this.onEmpty = onEmpty;
+    this.onResult = onResult;
     this.players = new Map(); // id -> player
     this.host = null;
     this.slots = Object.fromEntries(SLOT_IDS.map((s) => [s, null]));
@@ -85,6 +87,7 @@ export class Room {
 
   handle(player, msg) {
     const isHost = player.id === this.host;
+    if (this.ranked && msg.t !== 'in') return;
     switch (msg.t) {
       case 'slot': {
         if (this.phase !== 'lobby') return;
@@ -296,6 +299,7 @@ export class Room {
     this.lastResult = { result: m.result, score: m.score, roster: m.roster(), fouls: m.fouls };
     this.broadcast({ t: 'results', ...this.lastResult });
     this.broadcastRoom();
+    this.onResult?.(this, m);
   }
 
   tick() {
@@ -345,6 +349,7 @@ export class Room {
       phase: this.phase,
       settings: this.settings,
       isPublic: this.isPublic,
+      ranked: this.ranked,
       slots,
       spectators: [...this.players.values()].filter((p) => !seated.has(p.id)).map((p) => ({ pid: p.id, name: p.name })),
     };

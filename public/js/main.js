@@ -11,7 +11,8 @@ const $ = (id) => document.getElementById(id);
 const SCREENS = ['menu', 'practice', 'lobby', 'pause', 'results', 'modal'];
 
 // ------------------------------------------------------------------ persistent settings
-const DEFAULTS = { name: '', team: '', robot: 'team', camera: 'chase', quality: 'high', fieldOriented: true, autoStow: true, minimap: true, sound: true };
+const DEFAULT_TEAM = '611';
+const DEFAULTS = { name: '', team: DEFAULT_TEAM, robot: 'team', camera: 'chase', quality: 'high', fieldOriented: true, autoStow: true, minimap: true, sound: true };
 function loadSettings() {
   try {
     return { ...DEFAULTS, ...JSON.parse(localStorage.getItem('hh-settings') || '{}') };
@@ -37,6 +38,13 @@ const net = new Net();
 scene.setQuality(settings.quality);
 audio.enabled = settings.sound;
 hud.showMinimap = settings.minimap;
+
+const account = { token: null, user: null };
+try {
+  account.token = localStorage.getItem('hh-token');
+} catch {
+  /* storage unavailable */
+}
 
 const app = {
   session: null,
@@ -93,8 +101,8 @@ for (const id of ['cfg-ground', 'cfg-depot', 'cfg-ramp', 'cfg-level', 'cfg-mech'
   });
 }
 const profile = () => ({
-  name: $('in-name').value.trim() || 'Driver',
-  team: $('in-team').value.replace(/\D/g, '').slice(0, 5),
+  name: account.user?.name || $('in-name').value.trim() || 'Driver',
+  team: $('in-team').value.replace(/\D/g, '').slice(0, 5) || DEFAULT_TEAM,
   robot: robotSel.value,
   mods: TEAM_LOCKS[$('in-team').value.trim()] ? settings.mods : readMods(),
 });
@@ -105,7 +113,7 @@ for (const el of [$('in-name'), $('in-team'), robotSel]) {
     updateBlurb();
     writeMods(settings.mods);
     if (net.connected) {
-      net.send({ t: 'hello', ...profile() });
+      sendHello();
       net.send({ t: 'robot', robot: robotSel.value, mods: readMods() });
     }
   });
@@ -138,7 +146,7 @@ const actions = {
       robot: p.robot,
       mods: p.mods,
       name: p.name,
-      team: p.team || '709',
+      team: p.team,
       allies: Number($('pr-allies').value),
       opps: Number($('pr-opps').value),
       skill: Number($('pr-skill').value),
@@ -147,6 +155,17 @@ const actions = {
       bots: structuredClone(practiceBots),
     });
   },
+  ranked: () => {
+    if (!account.user) return openAccount('Log in or register to play ranked runs');
+    online({ t: 'ranked' });
+  },
+  account: async () => {
+    if (!account.user) return openAccount();
+    await apiCall('/logout', { method: 'POST' }).catch(() => {});
+    setAccount(null, null);
+    status('Logged out');
+  },
+  leaderboard: () => openLeaderboard(),
   quick: () => online({ t: 'quick' }),
   create: () => online({ t: 'create', isPublic: true }),
   'create-private': () => online({ t: 'create', isPublic: false }),
@@ -161,6 +180,7 @@ const actions = {
   'close-modal': () => closeModal(),
   resume: () => resume(),
   restart: () => {
+    if (app.room?.ranked) return online({ t: 'ranked' });
     if (app.session?.local) {
       app.session.reset();
       beginMatchView();
@@ -169,6 +189,7 @@ const actions = {
   },
   quit: () => quitToMenu(),
   again: () => {
+    if (app.room?.ranked) return online({ t: 'ranked' });
     if (app.session?.local) {
       app.session.reset();
       beginMatchView();
@@ -358,7 +379,7 @@ async function online(msg) {
     status(`${err.message}. Online play needs the Node server (npm start).`);
     return;
   }
-  net.send({ t: 'hello', ...profile() });
+  sendHello();
   net.send(msg);
   if (msg.t === 'create' && settings.officialRules) net.send({ t: 'settings', officialRules: true }); // host's saved rules choice
   status('');
@@ -368,6 +389,7 @@ net.on('room', ({ room }) => {
   app.room = room;
   document.body.classList.toggle('is-host', room.host === net.id);
   renderLobby(room);
+  if (room.ranked) return; // solo ranked runs go straight into the match, no lobby
   if (!inMatch() && (room.phase === 'lobby' || room.phase === 'results')) {
     const onModal = !$('modal').classList.contains('hidden');
     if (!onModal) show('lobby');
@@ -385,6 +407,14 @@ net.on('results', (msg) => {
   setTimeout(() => showResults(msg), 1200);
 });
 net.on('lobby', () => toLobby());
+net.on('ranked', (msg) => {
+  const box = $('res-ranked');
+  const where = `${msg.rank ? `#${msg.rank} on ${esc(msg.archName)}` : esc(msg.archName)} · ${msg.overallRank ? `#${msg.overallRank} overall` : ''}`;
+  box.innerHTML = msg.best
+    ? `🏆 <b>Ranked score ${msg.score}</b> — new personal best${msg.prev !== null ? ` (was ${msg.prev})` : ''}!<br /><span class="small">${where}</span>`
+    : `<b>Ranked score ${msg.score}</b> — your best with this mechanism is still ${msg.prev}<br /><span class="small">${where}</span>`;
+  box.classList.remove('hidden');
+});
 net.on('chat', ({ from, text }) => addChat(from, text));
 net.on('error', ({ msg }) => {
   status(msg);
@@ -497,12 +527,129 @@ function showResults(res) {
   if (app.resultsShown) return;
   app.resultsShown = true;
   renderResults(res, app.session?.roster);
+  if (!app.room?.ranked) $('res-ranked').classList.add('hidden');
   $('res-banner').scrollIntoView?.();
   show('results');
   input.enabled = false;
   const againBtn = document.querySelector('#results [data-action="again"]');
   const local = app.session?.local;
-  againBtn.textContent = local ? 'Play Again' : app.room?.host === net.id ? 'Back to Lobby' : 'Lobby';
+  againBtn.textContent = local || app.room?.ranked ? 'Play Again' : app.room?.host === net.id ? 'Back to Lobby' : 'Lobby';
+}
+
+// ------------------------------------------------------------------ accounts + leaderboard
+async function apiCall(path, { method = 'GET', body } = {}) {
+  const headers = { 'content-type': 'application/json' };
+  if (account.token) headers.authorization = `Bearer ${account.token}`;
+  const res = await fetch(`/api${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw Object.assign(new Error(data.error || `Server error (${res.status})`), { status: res.status });
+  return data;
+}
+
+function sendHello() {
+  net.send({ t: 'hello', ...profile(), token: account.token });
+}
+
+function setAccount(token, user) {
+  account.token = token;
+  account.user = user;
+  try {
+    if (token) localStorage.setItem('hh-token', token);
+    else localStorage.removeItem('hh-token');
+  } catch {
+    /* storage unavailable */
+  }
+  $('account-who').innerHTML = user ? `Logged in as <b>${esc(user.name)}</b>${user.admin ? ' · leaderboard admin' : ''}` : 'Not logged in — guests can play everything except ranked runs';
+  $('account-btn').textContent = user ? 'Log out' : 'Log in / Register';
+  // your account name is your driver name, so nobody can pose as you on the leaderboard
+  $('in-name').disabled = !!user;
+  $('in-name').value = user ? user.name : settings.name;
+  if (user?.team && !$('in-team').value) $('in-team').value = user.team;
+  if (net.connected) sendHello();
+}
+
+function openAccount(note = '') {
+  openModal('tpl-account');
+  const form = $('acct-form');
+  let mode = 'login';
+  const setMode = (m) => {
+    mode = m;
+    form.classList.toggle('login', m === 'login');
+    for (const t of $('acct-tabs').children) t.classList.toggle('on', t.dataset.mode === m);
+    $('acct-submit').textContent = m === 'login' ? 'Log in' : 'Create account';
+    form.password.autocomplete = m === 'login' ? 'current-password' : 'new-password';
+  };
+  setMode('login');
+  $('acct-error').textContent = note;
+  form.team.value = $('in-team').value;
+  $('acct-tabs').addEventListener('click', (e) => e.target.dataset.mode && setMode(e.target.dataset.mode));
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const f = Object.fromEntries(new FormData(form));
+    if (mode === 'register' && f.password !== f.confirm) return ($('acct-error').textContent = "Passwords don't match");
+    $('acct-submit').disabled = true;
+    try {
+      const r = await apiCall(mode === 'login' ? '/login' : '/register', { method: 'POST', body: { username: f.username, password: f.password, team: f.team } });
+      setAccount(r.token, r.user);
+      closeModal();
+      status(`Logged in as ${r.user.name}`);
+    } catch (err) {
+      $('acct-error').textContent = err.message;
+    } finally {
+      $('acct-submit').disabled = false;
+    }
+  });
+}
+
+function openLeaderboard() {
+  openModal('tpl-leaderboard');
+  $('lb-tabs').addEventListener('click', (e) => e.target.dataset.board && loadBoard(e.target.dataset.board));
+  $('lb-table').addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-remove]');
+    if (!b || !confirm(`Remove ${b.dataset.name}'s ${b.dataset.score} from the leaderboard?`)) return;
+    try {
+      await apiCall('/leaderboard', { method: 'DELETE', body: { user: b.dataset.remove, arch: b.dataset.arch } });
+    } catch (err) {
+      alert(err.message);
+    }
+    loadBoard($('lb-tabs').querySelector('.on')?.dataset.board || 'overall');
+  });
+  loadBoard('overall');
+}
+
+async function loadBoard(board) {
+  const table = $('lb-table');
+  if (!table) return;
+  table.innerHTML = '<tr><td class="muted">Loading…</td></tr>';
+  let d;
+  try {
+    d = await apiCall(`/leaderboard?board=${encodeURIComponent(board)}`);
+  } catch (err) {
+    table.innerHTML = `<tr><td class="muted">${esc(err.message)} — the leaderboard needs the online server.</td></tr>`;
+    return;
+  }
+  $('lb-tabs').innerHTML = Object.entries(d.boards)
+    .map(([k, t]) => `<button class="tab ${k === d.board ? 'on' : ''}" data-board="${k}">${esc(t)}</button>`)
+    .join('');
+  const admin = account.user?.admin;
+  const me = account.user?.name.toLowerCase();
+  const head = `<tr><th>#</th><th>Driver</th><th>Team</th><th>Score</th><th>Robot</th><th>Date</th>${admin ? '<th></th>' : ''}</tr>`;
+  const rows = d.rows.map(
+    (r) =>
+      `<tr class="${r.user === me ? 'me' : ''}"><td>${r.rank}</td><td>${esc(r.name)}</td><td>${r.team ? '#' + esc(r.team) : '—'}</td><td class="score">${r.score}</td>` +
+      `<td>${esc(r.robot)}<div class="build">${esc(r.build)}</div></td><td class="small">${new Date(r.date).toLocaleDateString()}</td>` +
+      (admin
+        ? `<td><button class="btn tiny ghost" data-remove="${esc(r.user)}" data-arch="${esc(r.arch)}" data-name="${esc(r.name)}" data-score="${r.score}" title="Remove this score">✕</button></td>`
+        : '') +
+      '</tr>',
+  );
+  table.innerHTML = head + (rows.join('') || `<tr><td colspan="7" class="muted">No ranked runs here yet — be the first!</td></tr>`);
+}
+
+if (account.token) {
+  apiCall('/me')
+    .then((r) => setAccount(account.token, r.user))
+    .catch((err) => err.status === 401 && setAccount(null, null));
 }
 
 // ------------------------------------------------------------------ events -> HUD/audio

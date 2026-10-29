@@ -842,6 +842,90 @@ ol.small li {
   line-height: 1.45;
 }
 
+/* ------------------------------------------------------------------ accounts + leaderboard */
+.account-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+}
+.account-bar b {
+  color: var(--accent-2);
+}
+.btn.ranked {
+  border-color: rgba(255, 216, 74, 0.5);
+  background: linear-gradient(180deg, rgba(255, 216, 74, 0.16), rgba(255, 216, 74, 0.05));
+}
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 12px;
+}
+.tab {
+  font: inherit;
+  font-family: var(--display);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-size: 14px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 12px;
+  cursor: pointer;
+}
+.tab.on {
+  color: #1a0d00;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.acct-form {
+  display: grid;
+  gap: 10px;
+  max-width: 360px;
+}
+.acct-form.login .reg-only {
+  display: none;
+}
+.acct-error {
+  color: #ff8a8c;
+  min-height: 1em;
+  margin: 0;
+  font-size: 13px;
+}
+.lb-wrap {
+  max-height: 55vh;
+  overflow: auto;
+}
+table.lb td.score {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 18px;
+  color: var(--accent);
+}
+table.lb tr.me td {
+  background: rgba(90, 209, 106, 0.1);
+}
+table.lb .build {
+  color: var(--muted);
+  font-size: 12px;
+}
+.res-ranked {
+  margin-top: 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 216, 74, 0.45);
+  background: rgba(255, 216, 74, 0.08);
+  text-align: center;
+}
+
 /* ------------------------------------------------------------------ phone */
 @media (max-width: 720px) {
   #menu {

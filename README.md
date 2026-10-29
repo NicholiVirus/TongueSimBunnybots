@@ -78,9 +78,21 @@ Auto-align (Space) also works at your **DEPOT** chutes: it parks you right under
 
 All robots are procedural placeholders for now. To drop in your team's CAD, see [`public/assets/robots/README.md`](public/assets/robots/README.md) — export a `.glb`, put it in `public/assets/robots/team/`, and set `model` on the `team` preset in `shared/robots.js`. Tune the preset's size, speed and elevator height to match the real robot.
 
+## Accounts, ranked runs and the leaderboard
+
+- **Register / log in** from the bar at the top of the main menu (username + password; passwords are stored as salted scrypt hashes). Logged-in drivers always play under their account name. Guests can still play practice and online rooms.
+- **🏆 Ranked Run** starts a solo match **on the server**: just your robot — no partners and no bots on the other alliance — with the default house rules. Only these runs count for the leaderboard, and because the server runs the match, scores can't be edited in the browser.
+- **Leaderboard** (main menu): one board per scoring mechanism (Passthrough elevator, Hopper + separate elevator, Hopper front + elevator back, Intake-elevator + hopper) keeping each driver's best score with that mechanism, plus **Overall** with each driver's best on any mechanism.
+- **Removing scores:** only leaderboard admins see the ✕ buttons. Set admin usernames with the `LEADERBOARD_ADMINS` environment variable (comma-separated) or in `ADMINS` in `server/accounts.js`. Register that username yourself first so nobody else can claim it.
+
+### Where accounts are saved
+
+- With `DATABASE_URL` set (any Postgres, e.g. Render Postgres, Neon or Supabase), everything is saved in one table (`hh_store`) and survives redeploys.
+- Without it, data goes to `data/data.json` (or `$DATA_DIR`). That is fine locally, but **on Render's free plan the disk is wiped on every deploy/restart** — use `DATABASE_URL` there (or a persistent disk mounted at `DATA_DIR`).
+
 ## Hosting online
 
-The server is a single Node process (Express + `ws`) and keeps everything in memory.
+The server is a single Node process (Express + `ws`). Matches live in memory; accounts and the leaderboard are saved as described above.
 
 - **LAN:** run `npm start` on one machine; others open `http://<that-machine's-IP>:3000`.
 - **Internet:** deploy to any Node host that supports WebSockets (Render, Railway, Fly.io…). Start command `npm start`; it listens on `$PORT`.
@@ -93,7 +105,7 @@ shared/   game logic used by BOTH server and browser
   sim.js      authoritative 60 Hz match sim: drive, collisions, pieces, scoring, fouls, RPs
   bot.js      A*-pathing bot drivers (fill empty slots, practice opponents)
   robots.js   robot presets (size, speed, elevator) + CAD hook
-server/   Express static host + WebSocket rooms (lobby, bots, 30 Hz snapshots)
+server/   Express static host + WebSocket rooms (lobby, bots, 30 Hz snapshots), accounts + leaderboard API
 public/   three.js client: field/robot rendering, HUD, menus, input, prediction
 test/     node --test suite (full 6-bot match, scoring, recirculation)
 ```
