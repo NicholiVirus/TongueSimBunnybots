@@ -218,6 +218,18 @@ test('official rules: oven carrots go to the opposing depot and human players si
   assert.equal(off.blue, 3, 'official: traded carrots go to the opposing depot');
 });
 
+test('waiting at the foot of the ramp cannot score into the oven', () => {
+  const m = new Match({ slots: [{ id: 'a', alliance: 'red', station: 1, robot: 'team' }] });
+  const r = m.robots[0];
+  while (m.phase === 'countdown') m.step();
+  r.x = F.OVEN.x0 - r.cfg.length / 2 - 0.02;
+  r.y = F.OVEN.yc;
+  r.th = 0; // facing the oven's tag face
+  m.setInput('a', { sp: 'oven', score: true });
+  for (let i = 0; i < 60; i++) m.step();
+  assert.equal(r.held.length, 2, 'no oven scoring from the ramp catch spot');
+});
+
 function fullBotMatch() {
   const slots = [];
   for (const alliance of ['red', 'blue']) for (const station of [1, 2, 3]) slots.push({ id: `${alliance}${station}`, alliance, station, robot: ['team', 'speedy', 'tank'][station - 1], bot: true });

@@ -171,7 +171,8 @@ export function alignTarget(r, alliance) {
     { kind: 'pantry', x: clamp(r.x, pb.x0 + 0.2, pb.x1 - 0.2), y: F.PANTRY.yFront - half - 0.01, th: shelfSide(r.cfg.mods) > 0 ? Math.PI / 2 : -Math.PI / 2 },
     { kind: 'oven', x: mouthX, y: ob.y1 + half + 0.02, th: -Math.PI / 2 },
     { kind: 'oven', x: mouthX, y: ob.y0 - half - 0.02, th: Math.PI / 2 },
-    { kind: 'oven', x: s > 0 ? ob.x0 - half - 0.02 : ob.x1 + half + 0.02, y: F.OVEN.yc, th: s > 0 ? 0 : Math.PI },
+    // foot of the RAMP (in front of the oven's tag face): where stored cakes roll down
+    { kind: 'ramp', x: s > 0 ? ob.x0 - half - 0.02 : ob.x1 + half + 0.02, y: F.OVEN.yc, th: s > 0 ? 0 : Math.PI },
     // DEPOT chutes in our FARM: park right under the 23" mouth, hopper toward the wall
     ...F.depotChutes(alliance).map((c) => ({ kind: 'depot', x: c.x + c.dx * (half + 0.05), y: c.y + c.dy * (half + 0.05), th: Math.atan2(-c.dy, -c.dx) })),
   ];
@@ -646,12 +647,11 @@ export class Match {
       const s = F.sideSign(a);
       const mx0 = Math.min(F.OVEN.mouthX0 * s, F.OVEN.mouthX1 * s);
       const mx1 = Math.max(F.OVEN.mouthX0 * s, F.OVEN.mouthX1 * s);
-      const frontX = s > 0 ? ob.x0 : ob.x1;
+      // only the two side mouths take pieces; the front (AprilTag) face is a solid panel —
+      // that's where robots wait to catch cakes from the RAMP, not a place to score
       const faces = [
-        // kitchen-side mouth, farm-side mouth, front (tag) face
         { ok: fx > mx0 - 0.1 && fx < mx1 + 0.1 && Math.abs(fy - ob.y1) < 0.25, n: [0, -1] },
         { ok: fx > mx0 - 0.1 && fx < mx1 + 0.1 && Math.abs(fy - ob.y0) < 0.25, n: [0, 1] },
-        { ok: Math.abs(fx - frontX) < 0.25 && fy > ob.y0 - 0.05 && fy < ob.y1 + 0.05, n: [s, 0] },
       ];
       for (const f of faces) {
         if (!f.ok) continue;
