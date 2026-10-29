@@ -552,6 +552,28 @@ function handleEvents(events) {
 // ------------------------------------------------------------------ main loop
 let last = performance.now();
 let acc = 0;
+// 60 Hz sim/input ticks run on their own clock, not the render frame rate, so a slow GPU (or a
+// busy laptop) still sends exactly 60 inputs/s online and practice runs at real speed.
+let tickClock = performance.now();
+function pumpTicks() {
+  const s = app.session;
+  const now = performance.now();
+  const dt = Math.max(0, Math.min(0.5, (now - tickClock) / 1000));
+  tickClock = now;
+  if (!s || app.paused) return;
+  acc += dt;
+  if (acc < TICK) return;
+  let n = 0;
+  const me = s.you ? s.view(now / 1000, 1)?.robots.get(s.you) : null;
+  while (acc >= TICK && n++ < 30) {
+    acc -= TICK;
+    const inp = input.sample({ forward: scene.controlForward(), heading: me?.th ?? 0, fieldOriented: settings.fieldOriented, autoStow: settings.autoStow });
+    s.tick(inp);
+  }
+  if (acc > TICK) acc = 0;
+}
+setInterval(pumpTicks, 4);
+
 function frame(now) {
   const dt = Math.max(0, Math.min(0.1, (now - last) / 1000)); // rAF time can be slightly before `last`
   last = now;
@@ -579,21 +601,18 @@ function frame(now) {
 
   let view = null;
   if (s) {
-    if (!app.paused) {
-      acc += dt;
-      let n = 0;
-      const me = s.you && acc >= TICK ? s.view(performance.now() / 1000, 1)?.robots.get(s.you) : null;
-      while (acc >= TICK && n++ < 8) {
-        acc -= TICK;
-        const inp = input.sample({ forward: scene.controlForward(), heading: me?.th ?? 0, fieldOriented: settings.fieldOriented, autoStow: settings.autoStow });
-        s.tick(inp);
-      }
-      if (acc > TICK) acc = 0;
-    }
+    pumpTicks();
     view = s.view(performance.now() / 1000, Math.min(1, acc / TICK));
     if (view) {
       view.rosterById = app.rosterById;
       handleEvents(s.drainEvents());
+      const ns = $('netstat');
+      ns.classList.toggle('hidden', !!s.local);
+      if (!s.local && s.stats) {
+        const st = s.stats;
+        const txt = `ping ${st.rtt} ms · buffer ${st.delayMs} ms`;
+        if (ns.textContent !== txt) ns.textContent = txt;
+      }
       hud.update(view, { you: s.you, alliance: scene.alliance, fieldOriented: settings.fieldOriented, camName: scene.camName(), audio }, dt);
       if (s.local && s.result && !app.resultsShown) {
         app.resultsShown = 'pending';

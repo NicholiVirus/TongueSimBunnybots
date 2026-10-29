@@ -4,7 +4,9 @@ import { ROBOTS, sanitizeMods, effectiveMods } from '../shared/robots.js';
 
 export const SLOT_IDS = ['red1', 'red2', 'red3', 'blue1', 'blue2', 'blue3'];
 const SNAP_EVERY = 2; // 60 Hz sim -> 30 Hz snapshots
-const MAX_QUEUE = 4;
+const KEYFRAME_EVERY = 60; // full snapshot every 2 s (deltas in between)
+const MAX_QUEUE = 8; // spare inputs per player before the server catches up (~133 ms)
+const MAX_OWED = 30; // late inputs the server may stand in for (matches the client's 30-tick catch-up)
 
 const clean = (s, n) =>
   String(s ?? '')
@@ -145,7 +147,10 @@ export class Room {
       case 'in':
         if (this.phase === 'match' && Array.isArray(msg.i)) {
           for (const inp of msg.i.slice(0, 8)) player.queue.push(sanitizeInput(inp));
-          while (player.queue.length > MAX_QUEUE * 2) player.queue.shift();
+          while (player.queue.length > MAX_OWED + MAX_QUEUE) {
+            player.queue.shift();
+            if (player.owed > 0) player.owed--;
+          }
         }
         break;
       default:
@@ -167,6 +172,8 @@ export class Room {
         p.queue = [];
         p.lastInput = {};
         p.idle = 0;
+        p.owed = 0;
+        p.filling = true;
       } else {
         slots.push({ id: s, alliance, station, robot: sl.robot, mods: sl.mods, name: sl.name || 'Bot', team: sl.team || 'BOT', bot: true });
         this.bots.push(new Bot(s));
@@ -182,55 +189,127 @@ export class Room {
   }
 
   sendStart(p) {
-    p.send({ t: 'start', roster: this.match.roster(), you: this.slotOf(p.id), code: this.code });
+    // include a full snapshot so a late joiner can render before the next keyframe
+    p.send({ t: 'start', roster: this.match.roster(), you: this.slotOf(p.id), code: this.code, snap: { ...this.match.snapshot(), kf: 1 } });
+  }
+
+  // Delta-encode a snapshot: pieces that haven't changed, and an unchanged score/inventory, are left
+  // out (the client keeps the last copy). Every KEYFRAME_EVERY snapshots everything is sent.
+  encodeSnapshot(snap) {
+    const d = (this.delta ??= { pieces: new Map(), s: '', inv: '', n: 0 });
+    const key = d.n++ % KEYFRAME_EVERY === 0;
+    const out = { ...snap };
+    const sJson = JSON.stringify(snap.s);
+    const invJson = JSON.stringify(snap.inv);
+    if (!key && sJson === d.s) delete out.s;
+    if (!key && invJson === d.inv) delete out.inv;
+    d.s = sJson;
+    d.inv = invJson;
+    const seen = new Map();
+    const changed = [];
+    for (const e of snap.p) {
+      const sig = e.join(',');
+      seen.set(e[0], sig);
+      if (key || d.pieces.get(e[0]) !== sig) changed.push(e);
+    }
+    const removed = key ? [] : [...d.pieces.keys()].filter((id) => !seen.has(id));
+    d.pieces = seen;
+    out.p = changed;
+    if (removed.length) out.pr = removed;
+    if (key) out.kf = 1;
+    return out;
   }
 
   run() {
     this.stop();
     let last = performance.now();
     let acc = 0;
-    let n = 0;
+    let sinceSnap = 0;
+    this.delta = null;
     this.loop = setInterval(() => {
       const now = performance.now();
       acc += Math.min(0.25, (now - last) / 1000);
       last = now;
-      while (acc >= TICK) {
+      while (acc >= TICK && this.match) {
         acc -= TICK;
-        this.tick(++n);
+        this.tick();
+        sinceSnap++;
       }
+      // at most ONE snapshot per timer callback: if the server fell behind and ran several ticks
+      // at once, clients get one up-to-date snapshot instead of a burst of stale ones
+      if (this.match && (sinceSnap >= SNAP_EVERY || this.match.phase === 'done')) {
+        sinceSnap = 0;
+        this.sendSnapshot();
+      }
+      if (this.match?.phase === 'done') this.finish();
     }, 1000 / 120);
   }
 
-  tick(n) {
+  // Input jitter buffer. Inputs are used one per tick on the client's own timeline. When the next one
+  // is late the last input is repeated, and the late one is skipped once it shows up (the client has
+  // already predicted it), so a late packet costs nothing while the driver holds the same keys. Each
+  // new dry spell adds one tick of headroom; ten calm seconds that always had spare inputs remove one.
+  nextInput(p) {
+    p.owed ??= 0;
+    p.calm ??= 0;
+    p.minQ ??= Infinity;
+    if (p.filling) {
+      if (p.queue.length < 2) return p.lastInput || {};
+      p.filling = false;
+    }
+    if (p.queue.length) {
+      while (p.owed > 0 && p.queue.length > 1) {
+        p.queue.shift();
+        p.owed--;
+      }
+      p.lastInput = p.queue.shift();
+      p.idle = 0;
+      p.dry = false;
+      p.minQ = Math.min(p.minQ, p.queue.length);
+      if (p.queue.length > MAX_QUEUE) p.owed++; // way behind (e.g. after a client hitch): catch up a tick
+      if (++p.calm >= 600) {
+        if (p.minQ >= 2) p.owed++; // never ran low: drop a tick of input latency
+        p.calm = 0;
+        p.minQ = Infinity;
+      }
+    } else if (p.lastInput?.seq) {
+      if (!p.dry) {
+        p.dry = true; // this first repeated tick becomes extra headroom
+        p.calm = 0;
+        p.minQ = Infinity;
+      } else p.owed = Math.min(p.owed + 1, MAX_OWED);
+      if (++p.idle > 20) p.lastInput = { seq: p.lastInput.seq }; // tab hidden / disconnected: stop the robot
+    }
+    return p.lastInput || {};
+  }
+
+  sendSnapshot() {
     const m = this.match;
-    if (!m) return;
+    const msg = JSON.stringify({ t: 'snap', s: this.encodeSnapshot(m.snapshot()), ev: m.drainEvents() });
+    for (const p of this.players.values()) p.sendRaw(msg);
+  }
+
+  finish() {
+    const m = this.match;
+    this.stop();
+    this.phase = 'results';
+    this.lastResult = { result: m.result, score: m.score, roster: m.roster(), fouls: m.fouls };
+    this.broadcast({ t: 'results', ...this.lastResult });
+    this.broadcastRoom();
+  }
+
+  tick() {
+    const m = this.match;
+    if (!m || m.phase === 'done') return;
     for (const s of SLOT_IDS) {
       const sl = this.slots[s];
       if (sl?.type !== 'human') continue;
       const p = this.players.get(sl.pid);
       if (!p) continue;
-      while (p.queue.length > MAX_QUEUE) p.queue.shift();
-      if (p.queue.length) {
-        p.lastInput = p.queue.shift();
-        p.idle = 0;
-      } else if (++p.idle > 20) p.lastInput = { seq: p.lastInput?.seq }; // tab hidden / lagging: stop the robot
-      m.setInput(s, p.lastInput || {});
+      m.setInput(s, this.nextInput(p));
     }
     for (const b of this.bots) b.update(m, TICK);
     m.step(TICK);
-    if (n % SNAP_EVERY === 0 || m.phase === 'done') {
-      const snap = m.snapshot();
-      const ev = m.drainEvents();
-      const msg = JSON.stringify({ t: 'snap', s: snap, ev });
-      for (const p of this.players.values()) p.sendRaw(msg);
-    }
-    if (m.phase === 'done') {
-      this.stop();
-      this.phase = 'results';
-      this.lastResult = { result: m.result, score: m.score, roster: m.roster(), fouls: m.fouls };
-      this.broadcast({ t: 'results', ...this.lastResult });
-      this.broadcastRoom();
-    }
   }
 
   stop() {

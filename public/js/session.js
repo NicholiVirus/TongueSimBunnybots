@@ -2,7 +2,7 @@
 //   LocalSession — runs the shared Match in the browser (offline practice).
 //   NetSession   — talks to the server; predicts your own drivetrain, interpolates the rest.
 
-import { Match, TICK, driveStep, collideRobotStatic, assistInput } from '/shared/sim.js';
+import { Match, TICK, driveStep, collideRobotStatic, assistInput, obbOverlap } from '/shared/sim.js';
 import { Bot } from '/shared/bot.js';
 import { getRobotConfig, randomMods } from '/shared/robots.js';
 
@@ -27,9 +27,21 @@ class Interp {
   get latest() {
     return this.buf[this.buf.length - 1];
   }
-  sample(tk) {
+  sample(tk, maxExtrap = 0) {
     const b = this.buf;
     if (!b.length) return null;
+    const last = b[b.length - 1];
+    // late packet: briefly extrapolate robots with their velocity instead of freezing them
+    if (maxExtrap > 0 && tk > last.tk) {
+      const dt = Math.min(tk - last.tk, maxExtrap) / 60;
+      const v = this.sample(last.tk);
+      for (const r of v.robots.values()) {
+        r.x += (r.vx || 0) * dt;
+        r.y += (r.vy || 0) * dt;
+        r.th += (r.w || 0) * dt;
+      }
+      return v;
+    }
     let i = b.length - 1;
     while (i > 0 && b[i - 1].tk > tk) i--;
     const s1 = b[i];
@@ -129,7 +141,9 @@ export class LocalSession {
 }
 
 // ------------------------------------------------------------------ online
-const INTERP_DELAY = 5; // ticks (~83 ms)
+const MIN_DELAY = 3; // ticks of interpolation delay (adapts upward with network jitter)
+const MAX_DELAY = 14;
+const MAX_EXTRAP = 6; // ticks (100 ms) of extrapolation when a snapshot is late
 
 export class NetSession {
   constructor(net, start) {
@@ -139,22 +153,54 @@ export class NetSession {
     this.you = start.you;
     this.me = this.roster.find((r) => r.id === this.you) || null;
     this.cfg = this.me ? getRobotConfig(this.me.robot, this.me.mods) : null;
+    this.cfgs = new Map(this.roster.map((r) => [r.id, getRobotConfig(r.robot, r.mods)]));
     this.interp = new Interp();
     this.events = [];
     this.seq = 0;
     this.pending = [];
     this.pred = null;
     this.off = { x: 0, y: 0, th: 0 };
-    this.clock = null;
+    this.clock = null; // smoothed (server tick - local tick)
+    this.jitter = 1; // smoothed |arrival deviation| in ticks
+    this.delay = 5;
+    this.full = null; // last full snapshot rebuilt from deltas
+    if (start.snap) this.onSnap({ s: start.snap, ev: [] });
+  }
+
+  // Server sends deltas: rebuild the full snapshot the interpolator expects.
+  rebuild(s) {
+    const prev = this.full;
+    let pieces;
+    if (s.kf || !prev) pieces = new Map(s.p.map((e) => [e[0], e]));
+    else {
+      pieces = new Map(prev.pieces);
+      for (const e of s.p) pieces.set(e[0], e);
+      for (const id of s.pr || []) pieces.delete(id);
+    }
+    const full = { ...s, s: s.s ?? prev?.s, inv: s.inv ?? prev?.inv, p: [...pieces.values()], pieces };
+    this.full = full;
+    return full;
   }
 
   onSnap(msg) {
-    const s = msg.s;
+    const s = this.rebuild(msg.s);
+    if (!s.s) return; // waiting for the first keyframe
     this.interp.push(s);
     if (msg.ev?.length) this.events.push(...msg.ev);
     const localTk = (performance.now() / 1000) * 60;
     const off = s.tk - localTk;
-    this.clock = this.clock === null || off > this.clock ? off : this.clock + (off - this.clock) * 0.02;
+    if (this.clock === null) this.clock = off;
+    else {
+      const dev = off - this.clock;
+      this.jitter += (Math.abs(dev) - this.jitter) * 0.1;
+      // follow the clock quickly when packets arrive early (less latency), slowly when late (jitter)
+      this.clock += dev * (dev > 0 ? 0.2 : 0.02);
+    }
+    // server tick at which AUTO starts (robots enable), so prediction switches on at the same moment
+    if (s.ph === 'countdown') this.enableAt = s.tk + Math.round((3 - s.pt) * 60);
+    // keep enough buffered for the snapshot interval plus typical jitter
+    const want = Math.max(MIN_DELAY, Math.min(MAX_DELAY, 2 + this.jitter * 2.5));
+    this.delay += (want - this.delay) * 0.05;
     if (this.you) {
       const e = s.r.find((q) => q[0] === this.you);
       if (e) this.reconcile(e, s);
@@ -162,14 +208,10 @@ export class NetSession {
   }
 
   reconcile(e, s) {
-    const base = { cfg: this.cfg, x: e[1], y: e[2], th: e[3], elev: e[4], vx: e[7], vy: e[8], w: e[9] };
+    const base = { cfg: this.cfg, x: e[1], y: e[2], th: e[3], elev: e[4], elevTarget: e[11], vx: e[7], vy: e[8], w: e[9] };
     const ack = e[10];
     this.pending = this.pending.filter((p) => p.seq > ack);
-    const en = (s.ph === 'auto' || s.ph === 'teleop') && !(e[6] & 32); // not while stunned
-    for (const p of this.pending) {
-      driveStep(base, assistInput(base, toSimInput(p.inp), this.me.alliance), TICK, en);
-      collideRobotStatic(base);
-    }
+    for (const p of this.pending) this.predictStep(base, p.inp, this.enabledFor(p.inp, s, e));
     if (this.pred) {
       const ex = this.pred.x + this.off.x - base.x;
       const ey = this.pred.y + this.off.y - base.y;
@@ -180,15 +222,22 @@ export class NetSession {
     this.pred = base;
   }
 
+  // Will the server have this robot enabled when this input is applied?
+  enabledFor(inp, snap, me) {
+    if (me && me[6] & 32) return false; // stunned
+    if (snap.ph === 'auto' || snap.ph === 'teleop') return true;
+    return snap.ph === 'countdown' && this.enableAt !== undefined && inp.at >= this.enableAt;
+  }
+
   tick(inp) {
     inp.seq = ++this.seq;
+    // estimated server tick when this input gets applied: now + one round trip + input buffer
+    inp.at = (performance.now() / 1000) * 60 + (this.clock ?? 0) + (this.net.rtt / 1000) * 60 + 2;
     this.net.send({ t: 'in', i: [inp] });
     const latest = this.interp.latest;
     if (this.pred && latest) {
-      const en = (latest.ph === 'auto' || latest.ph === 'teleop') && !((latest.r.find((q) => q[0] === this.you)?.[6] ?? 0) & 32);
-      this.pred.elev = latest.r.find((q) => q[0] === this.you)?.[4] ?? this.pred.elev;
-      driveStep(this.pred, assistInput(this.pred, toSimInput(inp), this.me.alliance), TICK, en);
-      collideRobotStatic(this.pred);
+      const me = latest.r.find((q) => q[0] === this.you);
+      this.predictStep(this.pred, inp, this.enabledFor(inp, latest, me));
       this.pending.push({ seq: inp.seq, inp });
       if (this.pending.length > 120) this.pending.shift();
     }
@@ -198,11 +247,53 @@ export class NetSession {
     this.off.th *= k;
   }
 
+  // Same drivetrain + elevator model as the server, so your robot (and its elevator) respond instantly.
+  predictStep(r, inp, en) {
+    const e = this.cfg.elevator;
+    if (en && inp.sp && e.setpoints[inp.sp] !== undefined && e.setpoints[inp.sp] <= e.max + 1e-6) r.elevTarget = inp.sp;
+    const target = Math.min(e.max, Math.max(e.min, e.setpoints[r.elevTarget] ?? e.min));
+    r.elev += Math.max(-e.speed * TICK, Math.min(e.speed * TICK, target - r.elev));
+    driveStep(r, assistInput(r, toSimInput(inp), this.me.alliance), TICK, en);
+    collideRobotStatic(r);
+    this.collideOthers(r);
+  }
+
+  // Other robots at their latest server positions: bump off them like the server does (we only move
+  // by our mass share), so pushing matches or getting hit doesn't snap your robot back afterwards.
+  collideOthers(r) {
+    const latest = this.interp.latest;
+    if (!latest) return;
+    const me = { cx: r.x, cy: r.y, hx: this.cfg.length / 2, hy: this.cfg.width / 2, th: r.th };
+    for (const e of latest.r) {
+      if (e[0] === this.you) continue;
+      const oc = this.cfgs.get(e[0]);
+      if (!oc) continue;
+      const m = obbOverlap(me, { cx: e[1], cy: e[2], hx: oc.length / 2, hy: oc.width / 2, th: e[3] });
+      if (!m) continue;
+      const share = oc.mass / (oc.mass + this.cfg.mass);
+      r.x += m.nx * m.depth * share;
+      r.y += m.ny * m.depth * share;
+      me.cx = r.x;
+      me.cy = r.y;
+      const vn = r.vx * m.nx + r.vy * m.ny;
+      if (vn < 0) {
+        r.vx -= vn * m.nx * share;
+        r.vy -= vn * m.ny * share;
+      }
+    }
+  }
+
+  get stats() {
+    return { rtt: Math.round(this.net.rtt), delayMs: Math.round((this.delay / 60) * 1000), jitterMs: Math.round((this.jitter / 60) * 1000) };
+  }
+
   view(now) {
     const latest = this.interp.latest;
     if (!latest) return null;
-    const tk = now * 60 + (this.clock ?? 0) - INTERP_DELAY;
-    const v = this.interp.sample(tk);
+    const tk = now * 60 + (this.clock ?? 0) - this.delay;
+    this.frames = (this.frames || 0) + 1;
+    if (tk > latest.tk) this.lateFrames = (this.lateFrames || 0) + 1; // buffer ran dry (extrapolating)
+    const v = this.interp.sample(tk, MAX_EXTRAP);
     if (this.you && this.pred) {
       const me = v.robots.get(this.you);
       const le = latest.r.find((q) => q[0] === this.you);
@@ -214,6 +305,8 @@ export class NetSession {
         me.vx = this.pred.vx;
         me.vy = this.pred.vy;
         me.w = this.pred.w;
+        me.elev = this.pred.elev;
+        me.elevTarget = this.pred.elevTarget;
       }
     }
     return { ...v, snap: latest };

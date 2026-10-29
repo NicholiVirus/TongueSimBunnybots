@@ -37,6 +37,7 @@ export class Net {
       } catch {
         return;
       }
+      this.bytesIn = (this.bytesIn || 0) + ev.data.length;
       if (msg.t === 'welcome') this.id = msg.id;
       if (msg.t === 'pong') this.rtt = performance.now() - msg.ts;
       this.handlers.get(msg.t)?.(msg);
