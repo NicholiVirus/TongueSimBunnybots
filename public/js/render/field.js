@@ -325,16 +325,20 @@ function buildOven(a) {
     bx(u, v, O.y0, O.y0 + 0.04, 0, h, frame);
     bx(u, v, O.y1 - 0.04, O.y1, 0, h, frame);
   }
-  // side rails above the mouth openings
-  bx(6.02, 7.14, O.y0, O.y0 + 0.03, 0.48, 0.62, ac);
-  bx(6.02, 7.14, O.y1 - 0.03, O.y1, 0.48, 0.62, ac);
-  // rear section walls (kitchen side solid, farm side rails)
-  bx(7.24, O.x1, O.y1 - 0.02, O.y1, 0, 0.77, ac);
-  bx(7.21, O.x1, O.y0, O.y0 + 0.03, 0.1, 0.27, ac);
+  // front bay: closed side panels under the ramp
+  bx(6.02, 7.14, O.y0, O.y0 + 0.03, 0.09, 0.62, ac);
+  bx(6.02, 7.14, O.y1 - 0.03, O.y1, 0.09, 0.62, ac);
+  // rear bay (by the alliance wall): OVEN mouths on both sides between the low and top rails
+  for (const [y0, y1] of [
+    [O.y1 - 0.03, O.y1],
+    [O.y0, O.y0 + 0.03],
+  ]) {
+    bx(7.21, O.x1, y0, y1, 0.09, O.mouthZ0, ac);
+    bx(7.21, O.x1, y0, y1, O.mouthZ1, O.mouthZ1 + 0.06, ac);
+  }
   // glowing oven interior
   const glow = new THREE.MeshStandardMaterial({ color: 0x3a1204, emissive: 0xff5a00, emissiveIntensity: 0.55, roughness: 1 });
-  bx(6.11, 7.05, O.y0 + 0.08, O.y1 - 0.08, 0.09, 0.47, glow);
-  bx(7.3, O.x1, O.y0 + 0.08, O.y1 - 0.08, 0.09, 0.28, glow);
+  bx(7.3, O.x1, O.y0 + 0.08, O.y1 - 0.08, 0.09, O.mouthZ1 - 0.04, glow);
   // the big ramp (sloped plate)
   const len = Math.hypot(O.x1 - O.frontX, O.rampHigh - O.rampLow);
   const ang = Math.atan2(O.rampHigh - O.rampLow, O.x1 - O.frontX);
@@ -365,7 +369,7 @@ function buildOven(a) {
     new THREE.PlaneGeometry(0.5, 0.12),
     new THREE.MeshBasicMaterial({ map: textCanvas('OVEN', { w: 256, h: 64, font: 'bold 56px "Barlow Condensed", sans-serif', color: '#fff', bg: a === 'red' ? '#a3242a' : '#1f4aa8' }) }),
   );
-  lbl.position.copy(V(X(6.6), O.y1 + 0.003, 0.55));
+  lbl.position.copy(V(X(6.6), O.y1 + 0.003, 0.35)); // on the closed front-bay panel; the mouth is behind it
   lbl.rotation.y = Math.PI;
   g.add(lbl);
   return g;

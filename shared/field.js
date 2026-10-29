@@ -73,7 +73,7 @@ export const pantrySlotX = (i, s) => s * (PANTRY.x0 + ((PANTRY.x1 - PANTRY.x0) /
 
 // OVEN + RAMP — one structure on the alliance wall between the KITCHEN and the
 // opposing FARM. The big ramp on top runs from the wall (z 1.21) down to the
-// front edge (z 0.58); the OVEN mouth opens on both long sides of the front bay.
+// front edge (z 0.58); the OVEN mouth opens on both long sides of the rear bay by the alliance wall.
 export const OVEN = {
   x0: 5.93,
   x1: FIELD.halfL,
@@ -83,10 +83,12 @@ export const OVEN = {
   rampHigh: 1.21,
   rampLow: 0.58,
   frontX: 6.0,
-  mouthX0: 6.11,
-  mouthX1: 7.05,
-  mouthZ0: 0.09,
-  mouthZ1: 0.48,
+  // the OVEN mouth is in the rear bay next to the alliance wall / driver stations, right above the
+  // little ramp that rolls pieces back to the RAMP human player (CAD: x 7.24–8.27, open 0.27–0.77 m)
+  mouthX0: 7.24,
+  mouthX1: 8.2,
+  mouthZ0: 0.27,
+  mouthZ1: 0.77,
 };
 
 // KITCHEN — robots start here (bounded by the perimeter, the ramp and the tape line).
