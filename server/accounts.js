@@ -8,7 +8,7 @@ const SESSION_DAYS = 90;
 
 // Accounts allowed to remove leaderboard scores. Add usernames here, or set LEADERBOARD_ADMINS
 // (comma-separated) on the host. Matching ignores upper/lower case.
-const ADMINS = [];
+const ADMINS = ['611_Nick'];
 
 // One leaderboard per scoring architecture, plus OVERALL (each driver's best on any of them).
 export const BOARDS = {
