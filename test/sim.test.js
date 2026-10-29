@@ -32,6 +32,32 @@ test('cakes stay stored on the ramp until a robot waits at the bottom', () => {
   assert.equal(r.held.length, 2, 'both cakes rolled straight into the waiting robot, 0.5 s apart');
 });
 
+test('aligned at the ramp, 1/2/3 roll down exactly that many cakes and leave the elevator alone', () => {
+  const m = new Match({ slots: [{ id: 'a', alliance: 'red', station: 1, robot: 'team', mods: { mech: 'separate' } }], preload: 0 });
+  const r = m.robots[0];
+  while (m.phase === 'countdown') m.step();
+  m.inv.red.rampCakes = 3;
+  r.x = F.OVEN.x0 - r.cfg.length / 2 - 0.3;
+  r.y = F.OVEN.yc + 0.2;
+  r.th = 0.2;
+  const press = (sp, secs) => {
+    m.setInput('a', { align: true, sp });
+    for (let i = 0; i < 6; i++) m.step();
+    m.setInput('a', { align: true });
+    for (let i = 0; i < 60 * secs; i++) m.step();
+  };
+  press(null, 3);
+  assert.equal(r.held.length, 0, 'aligned and waiting: no cakes until the driver asks');
+  assert.ok(m.inRampCatch(r), 'auto-align parked the robot at the foot of the ramp');
+  press('l1', 3);
+  assert.equal(r.held.length, 1, 'pressing 1 rolls one cake');
+  assert.equal(m.inv.red.rampCakes, 2);
+  assert.equal(r.elevTarget, 'stow', 'the elevator did not move to L1');
+  press('l3', 3);
+  assert.equal(r.held.length, 3, 'pressing 3 asks for 3 but only 2 more fit');
+  assert.equal(m.inv.red.rampCakes, 0);
+});
+
 test('auto-roll setting sends cakes down without a catcher', () => {
   const m = new Match({ slots: [{ id: 'a', alliance: 'red', station: 1, robot: 'team' }], preload: 0, autoRamp: true });
   while (m.phase === 'countdown') m.step();

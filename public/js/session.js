@@ -2,7 +2,7 @@
 //   LocalSession — runs the shared Match in the browser (offline practice).
 //   NetSession   — talks to the server; predicts your own drivetrain, interpolates the rest.
 
-import { Match, TICK, driveStep, collideRobotStatic, assistInput, obbOverlap } from '/shared/sim.js';
+import { Match, TICK, driveStep, collideRobotStatic, assistInput, obbOverlap, rampPick } from '/shared/sim.js';
 import { Bot } from '/shared/bot.js';
 import { getRobotConfig, randomMods } from '/shared/robots.js';
 
@@ -10,7 +10,7 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const lerpAngle = (a, b, t) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * t;
 
 function robotFromArr(e) {
-  return { id: e[0], x: e[1], y: e[2], th: e[3], elev: e[4], held: e[5], flags: e[6], vx: e[7], vy: e[8], w: e[9], ack: e[10], elevTarget: e[11], rampWait: e[12] || 0 };
+  return { id: e[0], x: e[1], y: e[2], th: e[3], elev: e[4], held: e[5], flags: e[6], vx: e[7], vy: e[8], w: e[9], ack: e[10], elevTarget: e[11], rampWait: e[12] || 0, rampReq: e[13] || 0 };
 }
 function pieceFromArr(e) {
   return { id: e[0], type: e[1] === 'k' ? 'cake' : 'carrot', st: e[2], x: e[3], y: e[4], z: e[5], th: e[6], roll: e[7] };
@@ -250,10 +250,12 @@ export class NetSession {
   // Same drivetrain + elevator model as the server, so your robot (and its elevator) respond instantly.
   predictStep(r, inp, en) {
     const e = this.cfg.elevator;
-    if (en && inp.sp && e.setpoints[inp.sp] !== undefined && e.setpoints[inp.sp] <= e.max + 1e-6) r.elevTarget = inp.sp;
+    const si = toSimInput(inp);
+    // (1/2/3 while aligned at the ramp ask for cakes instead of moving the elevator)
+    if (en && si.sp && !rampPick(r, si, this.me.alliance) && e.setpoints[si.sp] !== undefined && e.setpoints[si.sp] <= e.max + 1e-6) r.elevTarget = si.sp;
     const target = Math.min(e.max, Math.max(e.min, e.setpoints[r.elevTarget] ?? e.min));
     r.elev += Math.max(-e.speed * TICK, Math.min(e.speed * TICK, target - r.elev));
-    driveStep(r, assistInput(r, toSimInput(inp), this.me.alliance), TICK, en);
+    driveStep(r, assistInput(r, si, this.me.alliance), TICK, en);
     collideRobotStatic(r);
     this.collideOthers(r);
   }

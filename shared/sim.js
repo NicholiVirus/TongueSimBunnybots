@@ -206,6 +206,11 @@ export function assistInput(r, inp, alliance) {
   return out;
 }
 
+// Aligned to the foot of the RAMP, the 1/2/3 elevator keys instead ask the human player to roll down
+// that many cakes (handy for robots that lift one piece at a time). Returns 0 otherwise.
+const RAMP_PICK = { l1: 1, l2: 2, l3: 3 };
+export const rampPick = (r, inp, alliance) => (inp.align && RAMP_PICK[inp.sp] && alignTarget(r, alliance)?.kind === 'ramp' ? RAMP_PICK[inp.sp] : 0);
+
 // PANTRY shelves have no slots: a piece fits anywhere it doesn't overlap another (5 fit across).
 // Returns the closest valid center to `wantX` within `tol`, or null.
 export function shelfFit(xs, wantX, alliance, tol = Infinity) {
@@ -432,7 +437,12 @@ export class Match {
       } // any other team: K does nothing and says nothing (it's a secret)
     }
     r.prevTongue = !!inp.tongue;
-    if (en && inp.sp && e.setpoints[inp.sp] !== undefined && inp.sp !== r.elevTarget) {
+    const at = en && inp.align ? alignTarget(r, r.alliance) : null;
+    r.rampAligned = at?.kind === 'ramp';
+    const pick = en ? rampPick(r, inp, r.alliance) : 0;
+    if (pick && inp.sp !== r.prevSp) this.requestRamp(r, pick);
+    r.prevSp = inp.sp;
+    if (en && inp.sp && !pick && e.setpoints[inp.sp] !== undefined && inp.sp !== r.elevTarget) {
       if (e.setpoints[inp.sp] > e.max + 1e-6) this.denied(r, `This robot's elevator can't reach ${inp.sp.toUpperCase()}`);
       else r.elevTarget = inp.sp;
     }
@@ -465,7 +475,7 @@ export class Match {
       } else r.loadT = 0;
     }
 
-    if (en && inp.align && !alignTarget(r, r.alliance)) this.denied(r, 'Nothing to align to — get near your PANTRY, OVEN or DEPOT');
+    if (en && inp.align && !at) this.denied(r, 'Nothing to align to — get near your PANTRY, OVEN or DEPOT');
     driveStep(r, assistInput(r, inp, r.alliance), dt, en);
     collideRobotStatic(r);
 
@@ -1026,6 +1036,23 @@ export class Match {
   }
 
   // ---------------------------------------------------------------- human players
+  // Driver asked (1/2/3 while aligned at the ramp) for exactly n stored cakes.
+  requestRamp(r, n) {
+    if (!r.cfg.mods.ramp) return this.denied(r, "This robot can't catch cakes from the RAMP");
+    if (!this.humansLive()) return this.denied(r, 'The RAMP human player waits for TELEOP');
+    if (this.inv[r.alliance].rampCakes <= 0) return this.denied(r, 'No cakes stored on the RAMP');
+    const room = F.MAX_HELD - r.held.length - this.incoming(r);
+    if (room <= 0) return this.denied(r, 'Robot is full');
+    r.rampReq = Math.min(n, room);
+    r.rampManual = true;
+    this.emit({ type: 'hint', robot: r.id, msg: `Rolling ${r.rampReq} cake${r.rampReq > 1 ? 's' : ''} down the RAMP` });
+    return true;
+  }
+
+  humansLive() {
+    return this.phase === 'teleop' || (this.phase === 'auto' && !this.officialRules);
+  }
+
   // robot parked at the foot of its own RAMP (in the NEUTRAL ZONE, in front of the oven's tag face)
   inRampCatch(r) {
     const s = F.sideSign(r.alliance);
@@ -1051,7 +1078,7 @@ export class Match {
   }
 
   updateHumanPlayers(dt) {
-    const live = this.phase === 'teleop' || (this.phase === 'auto' && !this.officialRules);
+    const live = this.humansLive();
     for (const a of F.ALLIANCES) {
       const inv = this.inv[a];
       // DEPOT: roll a carrot down whichever chute an alliance robot is waiting under
@@ -1105,17 +1132,27 @@ export class Match {
 
       // RAMP: the human player stores cakes. Once an alliance robot has sat still at the
       // bottom of the ramp for RAMP_WAIT s, cakes roll down into it every RAMP_GAP s until
-      // it's full. With autoRamp on, cakes roll down as soon as they're ready.
+      // it's full. A driver aligned there (Space) instead picks how many with 1/2/3.
+      // With autoRamp on, cakes roll down as soon as they're ready.
       inv.rampTimer = Math.max(0, inv.rampTimer - dt);
       for (const q of this.robots) {
         if (q.alliance !== a) continue;
         const still = Math.hypot(q.vx, q.vy) < 0.3 && Math.abs(q.w) < 0.6;
-        q.rampWait = live && still && q.cfg.mods.ramp && this.inRampCatch(q) ? (q.rampWait || 0) + dt : 0;
+        const there = this.inRampCatch(q);
+        q.rampWait = live && still && q.cfg.mods.ramp && there ? (q.rampWait || 0) + dt : 0;
+        if (!there && !q.rampAligned) {
+          q.rampReq = 0; // drove off: the request (and manual mode) ends
+          q.rampManual = false;
+        }
       }
-      const catcher = this.robots.find((q) => q.alliance === a && q.rampWait >= RAMP_WAIT && q.held.length + this.incoming(q) < F.MAX_HELD);
+      const room = (q) => q.held.length + this.incoming(q) < F.MAX_HELD;
+      const catcher =
+        this.robots.find((q) => q.alliance === a && q.rampReq > 0 && this.inRampCatch(q) && room(q)) ||
+        this.robots.find((q) => q.alliance === a && q.rampWait >= RAMP_WAIT && (this.autoRamp || (!q.rampAligned && !q.rampManual)) && room(q));
       if (live && inv.rampCakes > 0 && inv.rampTimer <= 0 && (catcher || this.autoRamp)) {
         inv.rampCakes--;
         inv.rampTimer = RAMP_GAP;
+        if (catcher?.rampReq > 0) catcher.rampReq--;
         const s = F.sideSign(a);
         const p = this.addPiece('cake', s * (F.FIELD.halfL - 0.15), F.OVEN.yc, Math.PI / 2, 'ramp');
         p.z = F.OVEN.rampHigh;
@@ -1266,13 +1303,14 @@ export class Match {
         r3(r.th),
         r3(r.elev),
         held(r),
-        (r.intake ? 1 : 0) | (r.taxi ? 2 : 0) | (r.parked ? 4 : 0) | (r.carriage ? 8 : 0) | (r.tongue ? 16 : 0) | (r.stunUntil > this.time ? 32 : 0),
+        (r.intake ? 1 : 0) | (r.taxi ? 2 : 0) | (r.parked ? 4 : 0) | (r.carriage ? 8 : 0) | (r.tongue ? 16 : 0) | (r.stunUntil > this.time ? 32 : 0) | (r.rampAligned ? 64 : 0),
         r3(r.vx),
         r3(r.vy),
         r3(r.w),
         r.ack,
         r.elevTarget,
         r2(r.rampWait || 0),
+        r.rampReq || 0,
       ]),
       p: this.pieces.filter((p) => p.st !== 'held' && p.st !== 'gone').map((p) => [p.id, p.type === 'cake' ? 'k' : 'c', p.st[0], r3(p.x), r3(p.y), r3(p.z), r3(p.th), r2(p.roll)]),
       s: { red: this.score.red, blue: this.score.blue },
