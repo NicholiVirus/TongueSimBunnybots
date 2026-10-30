@@ -2,7 +2,7 @@
 //   LocalSession — runs the shared Match in the browser (offline practice).
 //   NetSession   — talks to the server; predicts your own drivetrain, interpolates the rest.
 
-import { Match, TICK, driveStep, collideRobotStatic, assistInput, obbOverlap, rampPick } from '/shared/sim.js';
+import { Match, TICK, driveStep, collideRobotStatic, assistInput, obbOverlap, rampPick, setupMove } from '/shared/sim.js';
 import { Bot } from '/shared/bot.js';
 import { getRobotConfig, randomMods } from '/shared/robots.js';
 
@@ -80,8 +80,8 @@ const toSimInput = (i) => ({ seq: i.seq, mx: i.mx, my: i.my, rot: i.rot, intake:
 
 // ------------------------------------------------------------------ offline
 export class LocalSession {
-  constructor({ alliance = 'red', station = 2, robot = 'team', mods, name = 'You', team = '', allies = 2, opps = 3, skill = 0.85, autoRamp = false, officialRules = false, bots }) {
-    this.opts = { alliance, station, robot, mods, name, team, allies, opps, skill, autoRamp, officialRules, bots };
+  constructor({ alliance = 'red', station = 2, robot = 'team', mods, name = 'You', team = '', allies = 2, opps = 3, skill = 0.85, autoRamp = false, officialRules = false, setup = false, bots }) {
+    this.opts = { alliance, station, robot, mods, name, team, allies, opps, skill, autoRamp, officialRules, setup, bots };
     this.local = true;
     this.reset();
   }
@@ -104,7 +104,7 @@ export class LocalSession {
       slots.push({ id: `${other}${s}`, alliance: other, station: s, robot: c.robot, mods: c.mods, name: `Bot ${s}`, team: String(900 + s), bot: true });
     });
     this.you = slots[0].id;
-    this.match = new Match({ slots, autoRamp: this.opts.autoRamp, officialRules: this.opts.officialRules });
+    this.match = new Match({ slots, autoRamp: this.opts.autoRamp, officialRules: this.opts.officialRules, setup: this.opts.setup });
     this.bots = slots.filter((s) => s.bot).map((s) => new Bot(s.id, { skill }));
     this.match.bots = this.bots;
     this.roster = this.match.roster();
@@ -190,7 +190,8 @@ export class NetSession {
     if (msg.ev?.length) this.events.push(...msg.ev);
     const localTk = (performance.now() / 1000) * 60;
     const off = s.tk - localTk;
-    if (this.clock === null) this.clock = off;
+    // first snapshot, or the server clock jumped (e.g. a ranked run was paused): resync at once
+    if (this.clock === null || Math.abs(off - this.clock) > 30) this.clock = off;
     else {
       const dev = off - this.clock;
       this.jitter += (Math.abs(dev) - this.jitter) * 0.1;
@@ -209,7 +210,7 @@ export class NetSession {
   }
 
   reconcile(e, s) {
-    const base = { cfg: this.cfg, x: e[1], y: e[2], th: e[3], elev: e[4], elevTarget: e[11], vx: e[7], vy: e[8], w: e[9] };
+    const base = { cfg: this.cfg, alliance: this.me.alliance, x: e[1], y: e[2], th: e[3], elev: e[4], elevTarget: e[11], vx: e[7], vy: e[8], w: e[9] };
     const ack = e[10];
     this.pending = this.pending.filter((p) => p.seq > ack);
     for (const p of this.pending) this.predictStep(base, p.inp, this.enabledFor(p.inp, s, e));
@@ -225,6 +226,7 @@ export class NetSession {
 
   // Will the server have this robot enabled when this input is applied?
   enabledFor(inp, snap, me) {
+    if (snap.ph === 'setup') return 'setup';
     if (me && me[6] & 32) return false; // stunned
     if (snap.ph === 'auto' || snap.ph === 'teleop') return true;
     return snap.ph === 'countdown' && this.enableAt !== undefined && inp.at >= this.enableAt;
@@ -252,6 +254,10 @@ export class NetSession {
   predictStep(r, inp, en) {
     const e = this.cfg.elevator;
     const si = toSimInput(inp);
+    if (en === 'setup') {
+      const others = (this.interp.latest?.r || []).filter((q) => q[0] !== this.you && this.cfgs.has(q[0])).map((q) => ({ x: q[1], y: q[2], th: q[3], cfg: this.cfgs.get(q[0]) }));
+      return setupMove(r, si, TICK, others);
+    }
     // (1/2/3 while aligned at the ramp ask for cakes instead of moving the elevator)
     if (en && si.sp && !rampPick(r, si, this.me.alliance) && e.setpoints[si.sp] !== undefined && e.setpoints[si.sp] <= e.max + 1e-6) r.elevTarget = si.sp;
     const target = Math.min(e.max, Math.max(e.min, e.setpoints[r.elevTarget] ?? e.min));

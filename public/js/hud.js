@@ -75,12 +75,13 @@ export class Hud {
     // scoreboard
     this.setText('score-red', String(s.s.red.totals.total));
     this.setText('score-blue', String(s.s.blue.totals.total));
-    const phaseName = { countdown: 'GET READY', auto: 'AUTO', teleop: s.eg ? 'ENDGAME' : 'TELEOP', post: 'MATCH OVER', done: 'FINAL' }[s.ph] || s.ph;
+    const phaseName = { setup: 'SETUP', countdown: 'GET READY', auto: 'AUTO', teleop: s.eg ? 'ENDGAME' : 'TELEOP', post: 'MATCH OVER', done: 'FINAL' }[s.ph] || s.ph;
     this.setText('phase', phaseName);
     $('phase').classList.toggle('endgame', !!s.eg);
-    const tl = s.ph === 'countdown' ? 150 : Math.ceil(s.tl);
+    const tl = s.ph === 'countdown' || s.ph === 'setup' ? 150 : Math.ceil(s.tl);
     this.setText('clock', `${Math.floor(tl / 60)}:${String(tl % 60).padStart(2, '0')}`);
 
+    if (s.ph === 'setup' && ctx.you && this.hintT < 1) this.hint('SETUP: drive to your starting spot (anywhere in your KITCHEN) · press ENTER or F to start');
     if (s.ph === 'countdown') {
       const n = Math.max(1, Math.ceil(F.TIMING.countdown - s.pt));
       if (n !== this.lastCount) {

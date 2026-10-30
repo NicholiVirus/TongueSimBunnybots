@@ -31,6 +31,10 @@ npm start          # http://localhost:3000
 
 Driving is field-oriented **from your camera's point of view** (driver station = like the real alliance wall).
 
+**Starting spot:** in practice (option **Pick my starting spot before the match**, on by default) and in ranked runs the match opens in **SETUP**: drive your robot anywhere inside your KITCHEN (it can't leave it or overlap another robot), then press **Enter** or **F** to start the countdown. No match time passes during setup.
+
+**Pause:** Esc freezes practice and ranked runs until you resume; shared online matches keep running.
+
 **Auto-align:** hold Space near your PANTRY and the robot locks its heading and distance to the shelves — you can only slide left/right, then press F. Shelves have no grid: the piece lands right where your robot is, as long as it doesn't overlap another (a small nudge against a neighbor is allowed). Near your OVEN it drives itself onto the closest mouth. When a robot carries both, cakes go to the pantry first and carrots to the oven first.
 
 ## The game (as implemented)

@@ -47,6 +47,7 @@ try {
 }
 
 const app = {
+  paused: false,
   session: null,
   room: null,
   resultsShown: false,
@@ -152,15 +153,17 @@ const actions = {
       skill: Number($('pr-skill').value),
       autoRamp: $('pr-autoramp').checked,
       officialRules: $('pr-official').checked,
+      setup: $('pr-setup').checked,
       bots: structuredClone(practiceBots),
     });
   },
   ranked: () => {
+    const pickStart = settings.pickStart !== false;
     if (!$('in-name').value.trim()) {
       $('in-name').focus();
       return status('Type your driver name first — ranked runs are saved under it');
     }
-    online({ t: 'ranked' });
+    online({ t: 'ranked', setup: pickStart });
   },
   leaderboard: () => openLeaderboard(),
   quick: () => online({ t: 'quick' }),
@@ -177,7 +180,7 @@ const actions = {
   'close-modal': () => closeModal(),
   resume: () => resume(),
   restart: () => {
-    if (app.room?.ranked) return online({ t: 'ranked' });
+    if (app.room?.ranked) return online({ t: 'ranked', setup: settings.pickStart !== false });
     if (app.session?.local) {
       app.session.reset();
       beginMatchView();
@@ -186,7 +189,7 @@ const actions = {
   },
   quit: () => quitToMenu(),
   again: () => {
-    if (app.room?.ranked) return online({ t: 'ranked' });
+    if (app.room?.ranked) return online({ t: 'ranked', setup: settings.pickStart !== false });
     if (app.session?.local) {
       app.session.reset();
       beginMatchView();
@@ -311,6 +314,11 @@ $('lobby-official').addEventListener('change', (e) => {
   saveSettings();
   net.send({ t: 'settings', officialRules: e.target.checked });
 });
+$('pr-setup').checked = settings.pickStart !== false;
+$('pr-setup').addEventListener('change', (e) => {
+  settings.pickStart = e.target.checked;
+  saveSettings();
+});
 // remember the rules choice between matches
 $('pr-official').checked = !!settings.officialRules;
 $('pr-official').addEventListener('change', (e) => {
@@ -335,6 +343,7 @@ function beginMatchView() {
   const s = app.session;
   scene.setMatch(s.roster, s.you, settings.camera);
   app.rosterById = new Map(s.roster.map((r) => [r.id, r]));
+  app.paused = false;
   app.resultsShown = false;
   hud.lastPhase = null;
   hud.lastCount = null;
@@ -355,12 +364,19 @@ function quitToMenu() {
 
 function pause() {
   if (!inMatch()) return;
-  // the match clock keeps running behind this menu (practice too); your robot just gets no input
-  $('pause-note').textContent = 'The match keeps running while this menu is open.';
+  // practice and ranked solo runs freeze until you resume; shared online matches can't
+  const solo = app.session.local || app.room?.ranked;
+  app.paused = !!solo;
+  if (app.room?.ranked) net.send({ t: 'pause', on: true });
+  $('pause-note').textContent = solo ? 'Paused — the match clock is frozen until you resume.' : 'Online match keeps running while this menu is open.';
   show('pause');
   input.enabled = false;
 }
 function resume() {
+  if (app.paused && app.room?.ranked) net.send({ t: 'pause', on: false });
+  app.paused = false;
+  tickClock = performance.now(); // don't replay the paused time
+  acc = 0;
   show(null);
   input.enabled = true;
 }
@@ -696,7 +712,7 @@ function pumpTicks() {
   const now = performance.now();
   const dt = Math.max(0, Math.min(0.5, (now - tickClock) / 1000));
   tickClock = now;
-  if (!s) return;
+  if (!s || app.paused) return;
   acc += dt;
   if (acc < TICK) return;
   let n = 0;

@@ -211,6 +211,26 @@ export function assistInput(r, inp, alliance) {
 const RAMP_PICK = { l1: 1, l2: 2, l3: 3 };
 export const rampPick = (r, inp, alliance) => (inp.align && RAMP_PICK[inp.sp] && alignTarget(r, alliance)?.kind === 'ramp' ? RAMP_PICK[inp.sp] : 0);
 
+// Starting spot: the whole robot has to be inside its own KITCHEN.
+export const inStartZone = (r) => F.polyInside(boxCorners(robotBox(r)), F.kitchenPoly(r.alliance));
+
+// Drive during SETUP, kept inside the KITCHEN and off other robots (slides along edges).
+export function setupMove(r, inp, dt, others = []) {
+  const ok = () => inStartZone(r) && !others.some((o) => obbOverlap(robotBox(r), robotBox(o)));
+  const prev = { x: r.x, y: r.y, th: r.th };
+  driveStep(r, { mx: inp.mx, my: inp.my, rot: inp.rot }, dt, true);
+  collideRobotStatic(r);
+  if (ok()) return;
+  const next = { x: r.x, y: r.y, th: r.th };
+  for (const tryPose of [{ ...prev, x: next.x, th: next.th }, { ...prev, y: next.y, th: next.th }, { ...prev, x: next.x, y: next.y }, prev]) {
+    Object.assign(r, tryPose);
+    if (ok()) break;
+  }
+  if (r.x !== next.x) r.vx = 0;
+  if (r.y !== next.y) r.vy = 0;
+  if (r.th !== next.th) r.w = 0;
+}
+
 // PANTRY shelves have no slots: a piece fits anywhere it doesn't overlap another (5 fit across).
 // Returns the closest valid center to `wantX` within `tol`, or null.
 export function shelfFit(xs, wantX, alliance, tol = Infinity) {
@@ -264,14 +284,15 @@ export class Match {
    * @param {object} opts
    * @param {Array<{id:string, alliance:'red'|'blue', station:number, robot:string, name?:string, team?:string, bot?:boolean}>} opts.slots
    */
-  constructor({ slots, preload = F.PRELOAD_PER_ROBOT, autoRamp = false, officialRules = false } = {}) {
+  constructor({ slots, preload = F.PRELOAD_PER_ROBOT, autoRamp = false, officialRules = false, setup = false } = {}) {
     this.autoRamp = autoRamp; // true: cakes roll down as soon as they're ready, caught or not
     // official competition rules (manual v1.2) instead of the sim's house rules:
     //  - traded oven carrots go to the OPPOSING depot (house: back to your own depot)
     //  - no human-player actions during AUTO: no depot feeding, trades or ramp cakes (house: allowed)
     this.officialRules = officialRules;
     this.time = 0; // seconds since the match was created
-    this.phase = 'countdown';
+    // setup: before the countdown, drivers place their robot anywhere in their KITCHEN (no clock)
+    this.phase = setup ? 'setup' : 'countdown';
     this.phaseTime = 0;
     this.matchTime = 0; // seconds since AUTO started
     this.robots = [];
@@ -373,7 +394,7 @@ export class Match {
     return this.phase === 'auto' || this.phase === 'teleop';
   }
   get timeLeft() {
-    if (this.phase === 'countdown') return F.MATCH_LENGTH;
+    if (this.phase === 'setup' || this.phase === 'countdown') return F.MATCH_LENGTH;
     if (this.phase === 'auto' || this.phase === 'teleop') return Math.max(0, F.MATCH_LENGTH - this.matchTime);
     return 0;
   }
@@ -387,6 +408,7 @@ export class Match {
 
   // ---------------------------------------------------------------- main step
   step(dt = TICK) {
+    if (this.phase === 'setup') return this.setupStep(dt);
     this.tick++;
     this.time += dt;
     this.phaseTime += dt;
@@ -414,6 +436,24 @@ export class Match {
     if (this.phase === 'post' && this.phaseTime >= F.TIMING.post) {
       this.scoreEndgame();
       this.setPhase('done');
+    }
+  }
+
+  // SETUP: drivers move their robot around inside their own KITCHEN; ENTER/F starts the countdown.
+  setupStep(dt) {
+    this.tick++;
+    for (const r of this.robots) {
+      if (r.bot) continue;
+      if (r.input?.score) {
+        this.setPhase('countdown');
+        return;
+      }
+      setupMove(
+        r,
+        r.input || {},
+        dt,
+        this.robots.filter((q) => q !== r),
+      );
     }
   }
 

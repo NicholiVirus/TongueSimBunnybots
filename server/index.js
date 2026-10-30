@@ -160,6 +160,7 @@ wss.on('connection', (ws) => {
       case 'ranked': {
         player.room?.remove(player);
         const room = createRoom(false, true);
+        room.setup = msg.setup !== false; // drive to a starting spot before the countdown
         room.add(player);
         room.start();
         break;

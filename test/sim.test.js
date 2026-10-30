@@ -256,6 +256,28 @@ test('waiting at the foot of the ramp cannot score into the oven', () => {
   assert.equal(r.held.length, 2, 'no oven scoring from the ramp catch spot');
 });
 
+test('setup: drive anywhere inside your KITCHEN, the clock waits, ENTER/F starts the countdown', async () => {
+  const { inStartZone } = await import('../shared/sim.js');
+  const m = new Match({
+    slots: [
+      { id: 'a', alliance: 'red', station: 2, robot: 'team' },
+      { id: 'b', alliance: 'red', station: 1, robot: 'team', bot: true },
+    ],
+    setup: true,
+  });
+  const r = m.robots[0];
+  assert.equal(m.phase, 'setup');
+  m.setInput('a', { mx: -1, my: 0.3 }); // try to leave the kitchen
+  for (let i = 0; i < 60 * 6; i++) m.step();
+  assert.equal(m.phase, 'setup');
+  assert.equal(m.timeLeft, F.MATCH_LENGTH, 'no match time passes in setup');
+  assert.ok(inStartZone(r), 'robot stays fully inside the kitchen');
+  assert.ok(Math.abs(r.x - F.startPose('red', 2).x) > 0.5, 'but it did move');
+  m.setInput('a', { score: true });
+  m.step();
+  assert.equal(m.phase, 'countdown');
+});
+
 function fullBotMatch() {
   const slots = [];
   for (const alliance of ['red', 'blue']) for (const station of [1, 2, 3]) slots.push({ id: `${alliance}${station}`, alliance, station, robot: ['team', 'speedy', 'tank'][station - 1], bot: true });
