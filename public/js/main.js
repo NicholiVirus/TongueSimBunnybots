@@ -57,6 +57,7 @@ const app = {
 // ------------------------------------------------------------------ screens
 function show(screen) {
   for (const s of SCREENS) $(s).classList.toggle('hidden', s !== screen);
+  if (screen === 'menu') refreshMenuBoard();
 }
 function inMatch() {
   return !!app.session;
@@ -414,6 +415,7 @@ net.on('ranked', (msg) => {
     ? `🏆 <b>Ranked score ${msg.score}</b> — new personal best${msg.prev !== null ? ` (was ${msg.prev})` : ''}!<br /><span class="small">${where}</span>`
     : `<b>Ranked score ${msg.score}</b> — your best with this mechanism is still ${msg.prev}<br /><span class="small">${where}</span>`;
   box.classList.remove('hidden');
+  menuBoardAt = 0;
 });
 net.on('chat', ({ from, text }) => addChat(from, text));
 net.on('error', ({ msg }) => {
@@ -645,6 +647,30 @@ async function loadBoard(board) {
   );
   table.innerHTML = head + (rows.join('') || `<tr><td colspan="7" class="muted">No ranked runs here yet — be the first!</td></tr>`);
 }
+
+// top 10 of the overall board, shown on the main menu to everyone (guests included)
+let menuBoardAt = 0;
+async function refreshMenuBoard(force = false) {
+  if (!force && Date.now() - menuBoardAt < 15000) return;
+  menuBoardAt = Date.now();
+  const table = $('mb-table');
+  try {
+    const d = await apiCall('/leaderboard?board=overall');
+    const me = account.user?.name.toLowerCase();
+    table.innerHTML =
+      d.rows
+        .slice(0, 10)
+        .map(
+          (r) =>
+            `<tr class="${r.user === me ? 'me' : ''}"><td>${r.rank}</td><td>${esc(r.name)}${r.team ? ` <span class="muted small">#${esc(r.team)}</span>` : ''}<div class="build">${esc(r.build)}</div></td><td class="score">${r.score}</td></tr>`,
+        )
+        .join('') || '<tr><td class="muted">No ranked runs yet — play a 🏆 Ranked Run to claim #1!</td></tr>';
+  } catch {
+    menuBoardAt = 0;
+    table.innerHTML = '<tr><td class="muted">Leaderboard unavailable offline.</td></tr>';
+  }
+}
+refreshMenuBoard();
 
 if (account.token) {
   apiCall('/me')

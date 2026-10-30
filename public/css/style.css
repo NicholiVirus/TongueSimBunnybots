@@ -926,6 +926,37 @@ table.lb .build {
   text-align: center;
 }
 
+#menu {
+  flex-wrap: wrap;
+  gap: 24px;
+}
+.menu-board {
+  width: min(400px, 100%);
+  margin: auto clamp(0px, 4vw, 70px) auto auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.mb-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.mb-head h3 {
+  margin: 0;
+}
+.menu-board table.lb td {
+  padding: 4px 6px;
+}
+.menu-board table.lb td.score {
+  font-size: 16px;
+  text-align: right;
+}
+
 /* ------------------------------------------------------------------ phone */
 @media (max-width: 720px) {
   #menu {
@@ -935,6 +966,9 @@ table.lb .build {
   }
   h1 {
     font-size: 44px;
+  }
+  .menu-board {
+    margin: 0;
   }
   .alliances,
   .two-col,

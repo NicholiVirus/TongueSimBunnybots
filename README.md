@@ -82,7 +82,7 @@ All robots are procedural placeholders for now. To drop in your team's CAD, see 
 
 - **Register / log in** from the bar at the top of the main menu (username + password; passwords are stored as salted scrypt hashes). Logged-in drivers always play under their account name. Guests can still play practice and online rooms.
 - **🏆 Ranked Run** starts a solo match **on the server**: just your robot — no partners and no bots on the other alliance — with the default house rules. Only these runs count for the leaderboard, and because the server runs the match, scores can't be edited in the browser.
-- **Leaderboard** (main menu): one board per scoring mechanism (Passthrough elevator, Hopper + separate elevator, Hopper front + elevator back, Intake-elevator + hopper) keeping each driver's best score with that mechanism, plus **Overall** with each driver's best on any mechanism.
+- **Leaderboard**: the top 10 drivers show on the main menu for everyone (guests too); the full board has one board per scoring mechanism (Passthrough elevator, Hopper + separate elevator, Hopper front + elevator back, Intake-elevator + hopper) keeping each driver's best score with that mechanism, plus **Overall** with each driver's best on any mechanism.
 - **Removing scores:** only leaderboard admins see the ✕ buttons. Set admin usernames with the `LEADERBOARD_ADMINS` environment variable (comma-separated) or in `ADMINS` in `server/accounts.js` (currently `611_Nick`). Register that username yourself first so nobody else can claim it.
 
 ### Where accounts are saved
