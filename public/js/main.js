@@ -39,9 +39,9 @@ scene.setQuality(settings.quality);
 audio.enabled = settings.sound;
 hud.showMinimap = settings.minimap;
 
-const account = { token: null, user: null };
+let adminKey = null; // leaderboard admin key (remembered on this device)
 try {
-  account.token = localStorage.getItem('hh-token');
+  adminKey = localStorage.getItem('hh-admin-key');
 } catch {
   /* storage unavailable */
 }
@@ -102,7 +102,7 @@ for (const id of ['cfg-ground', 'cfg-depot', 'cfg-ramp', 'cfg-level', 'cfg-mech'
   });
 }
 const profile = () => ({
-  name: account.user?.name || $('in-name').value.trim() || 'Driver',
+  name: $('in-name').value.trim() || 'Driver',
   team: $('in-team').value.replace(/\D/g, '').slice(0, 5) || DEFAULT_TEAM,
   robot: robotSel.value,
   mods: TEAM_LOCKS[$('in-team').value.trim()] ? settings.mods : readMods(),
@@ -157,14 +157,11 @@ const actions = {
     });
   },
   ranked: () => {
-    if (!account.user) return openAccount('Log in or register to play ranked runs');
+    if (!$('in-name').value.trim()) {
+      $('in-name').focus();
+      return status('Type your driver name first — ranked runs are saved under it');
+    }
     online({ t: 'ranked' });
-  },
-  account: async () => {
-    if (!account.user) return openAccount();
-    await apiCall('/logout', { method: 'POST' }).catch(() => {});
-    setAccount(null, null);
-    status('Logged out');
   },
   leaderboard: () => openLeaderboard(),
   quick: () => online({ t: 'quick' }),
@@ -410,10 +407,10 @@ net.on('results', (msg) => {
 net.on('lobby', () => toLobby());
 net.on('ranked', (msg) => {
   const box = $('res-ranked');
-  const where = `${msg.rank ? `#${msg.rank} on ${esc(msg.archName)}` : esc(msg.archName)} · ${msg.overallRank ? `#${msg.overallRank} overall` : ''}`;
-  box.innerHTML = msg.best
-    ? `🏆 <b>Ranked score ${msg.score}</b> — new personal best${msg.prev !== null ? ` (was ${msg.prev})` : ''}!<br /><span class="small">${where}</span>`
-    : `<b>Ranked score ${msg.score}</b> — your best with this mechanism is still ${msg.prev}<br /><span class="small">${where}</span>`;
+  box.innerHTML =
+    msg.overallRank === 1
+      ? `🏆 <b>NEW GLOBAL RECORD: ${msg.score}</b><br /><span class="small">#1 overall · #${msg.rank} on ${esc(msg.archName)}</span>`
+      : `<b>Ranked run saved: ${msg.score}</b><br /><span class="small">#${msg.overallRank} overall · #${msg.rank} on ${esc(msg.archName)}</span>`;
   box.classList.remove('hidden');
   menuBoardAt = 0;
 });
@@ -538,10 +535,10 @@ function showResults(res) {
   againBtn.textContent = local || app.room?.ranked ? 'Play Again' : app.room?.host === net.id ? 'Back to Lobby' : 'Lobby';
 }
 
-// ------------------------------------------------------------------ accounts + leaderboard
+// ------------------------------------------------------------------ leaderboard
 async function apiCall(path, { method = 'GET', body } = {}) {
   const headers = { 'content-type': 'application/json' };
-  if (account.token) headers.authorization = `Bearer ${account.token}`;
+  if (adminKey) headers['x-admin-key'] = adminKey;
   const res = await fetch(`/api${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw Object.assign(new Error(data.error || `Server error (${res.status})`), { status: res.status });
@@ -549,58 +546,17 @@ async function apiCall(path, { method = 'GET', body } = {}) {
 }
 
 function sendHello() {
-  net.send({ t: 'hello', ...profile(), token: account.token });
+  net.send({ t: 'hello', ...profile() });
 }
 
-function setAccount(token, user) {
-  account.token = token;
-  account.user = user;
+function setAdminKey(k) {
+  adminKey = k;
   try {
-    if (token) localStorage.setItem('hh-token', token);
-    else localStorage.removeItem('hh-token');
+    if (k) localStorage.setItem('hh-admin-key', k);
+    else localStorage.removeItem('hh-admin-key');
   } catch {
     /* storage unavailable */
   }
-  $('account-who').innerHTML = user ? `Logged in as <b>${esc(user.name)}</b>${user.admin ? ' · leaderboard admin' : ''}` : 'Not logged in — guests can play everything except ranked runs';
-  $('account-btn').textContent = user ? 'Log out' : 'Log in / Register';
-  // your account name is your driver name, so nobody can pose as you on the leaderboard
-  $('in-name').disabled = !!user;
-  $('in-name').value = user ? user.name : settings.name;
-  if (user?.team && !$('in-team').value) $('in-team').value = user.team;
-  if (net.connected) sendHello();
-}
-
-function openAccount(note = '') {
-  openModal('tpl-account');
-  const form = $('acct-form');
-  let mode = 'login';
-  const setMode = (m) => {
-    mode = m;
-    form.classList.toggle('login', m === 'login');
-    for (const t of $('acct-tabs').children) t.classList.toggle('on', t.dataset.mode === m);
-    $('acct-submit').textContent = m === 'login' ? 'Log in' : 'Create account';
-    form.password.autocomplete = m === 'login' ? 'current-password' : 'new-password';
-  };
-  setMode('login');
-  $('acct-error').textContent = note;
-  form.team.value = $('in-team').value;
-  $('acct-tabs').addEventListener('click', (e) => e.target.dataset.mode && setMode(e.target.dataset.mode));
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const f = Object.fromEntries(new FormData(form));
-    if (mode === 'register' && f.password !== f.confirm) return ($('acct-error').textContent = "Passwords don't match");
-    $('acct-submit').disabled = true;
-    try {
-      const r = await apiCall(mode === 'login' ? '/login' : '/register', { method: 'POST', body: { username: f.username, password: f.password, team: f.team } });
-      setAccount(r.token, r.user);
-      closeModal();
-      status(`Logged in as ${r.user.name}`);
-    } catch (err) {
-      $('acct-error').textContent = err.message;
-    } finally {
-      $('acct-submit').disabled = false;
-    }
-  });
 }
 
 function openLeaderboard() {
@@ -610,10 +566,27 @@ function openLeaderboard() {
     const b = e.target.closest('[data-remove]');
     if (!b || !confirm(`Remove ${b.dataset.name}'s ${b.dataset.score} from the leaderboard?`)) return;
     try {
-      await apiCall('/leaderboard', { method: 'DELETE', body: { user: b.dataset.remove, arch: b.dataset.arch } });
+      await apiCall('/leaderboard', { method: 'DELETE', body: { id: b.dataset.remove } });
     } catch (err) {
       alert(err.message);
     }
+    loadBoard($('lb-tabs').querySelector('.on')?.dataset.board || 'overall');
+  });
+  $('lb-admin').textContent = adminKey ? 'Admin ✓ (sign out)' : 'Admin';
+  $('lb-admin').addEventListener('click', async () => {
+    if (adminKey) setAdminKey(null);
+    else {
+      const k = prompt('Leaderboard admin key');
+      if (!k) return;
+      setAdminKey(k);
+      try {
+        await apiCall('/admin', { method: 'POST' });
+      } catch (err) {
+        setAdminKey(null);
+        alert(err.message);
+      }
+    }
+    $('lb-admin').textContent = adminKey ? 'Admin ✓ (sign out)' : 'Admin';
     loadBoard($('lb-tabs').querySelector('.on')?.dataset.board || 'overall');
   });
   loadBoard('overall');
@@ -633,16 +606,13 @@ async function loadBoard(board) {
   $('lb-tabs').innerHTML = Object.entries(d.boards)
     .map(([k, t]) => `<button class="tab ${k === d.board ? 'on' : ''}" data-board="${k}">${esc(t)}</button>`)
     .join('');
-  const admin = account.user?.admin;
-  const me = account.user?.name.toLowerCase();
+  const admin = !!adminKey;
   const head = `<tr><th>#</th><th>Driver</th><th>Team</th><th>Score</th><th>Robot</th><th>Date</th>${admin ? '<th></th>' : ''}</tr>`;
   const rows = d.rows.map(
     (r) =>
-      `<tr class="${r.user === me ? 'me' : ''}"><td>${r.rank}</td><td>${esc(r.name)}</td><td>${r.team ? '#' + esc(r.team) : '—'}</td><td class="score">${r.score}</td>` +
+      `<tr><td>${r.rank}</td><td>${esc(r.name)}</td><td>${r.team ? '#' + esc(r.team) : '—'}</td><td class="score">${r.score}</td>` +
       `<td>${esc(r.robot)}<div class="build">${esc(r.build)}</div></td><td class="small">${new Date(r.date).toLocaleDateString()}</td>` +
-      (admin
-        ? `<td><button class="btn tiny ghost" data-remove="${esc(r.user)}" data-arch="${esc(r.arch)}" data-name="${esc(r.name)}" data-score="${r.score}" title="Remove this score">✕</button></td>`
-        : '') +
+      (admin ? `<td><button class="btn tiny ghost" data-remove="${esc(r.id)}" data-name="${esc(r.name)}" data-score="${r.score}" title="Remove this score">✕</button></td>` : '') +
       '</tr>',
   );
   table.innerHTML = head + (rows.join('') || `<tr><td colspan="7" class="muted">No ranked runs here yet — be the first!</td></tr>`);
@@ -656,13 +626,12 @@ async function refreshMenuBoard(force = false) {
   const table = $('mb-table');
   try {
     const d = await apiCall('/leaderboard?board=overall');
-    const me = account.user?.name.toLowerCase();
     table.innerHTML =
       d.rows
         .slice(0, 10)
         .map(
           (r) =>
-            `<tr class="${r.user === me ? 'me' : ''}"><td>${r.rank}</td><td>${esc(r.name)}${r.team ? ` <span class="muted small">#${esc(r.team)}</span>` : ''}<div class="build">${esc(r.build)}</div></td><td class="score">${r.score}</td></tr>`,
+            `<tr><td>${r.rank}</td><td>${esc(r.name)}${r.team ? ` <span class="muted small">#${esc(r.team)}</span>` : ''}<div class="build">${esc(r.build)}</div></td><td class="score">${r.score}</td></tr>`,
         )
         .join('') || '<tr><td class="muted">No ranked runs yet — play a 🏆 Ranked Run to claim #1!</td></tr>';
   } catch {
@@ -671,12 +640,6 @@ async function refreshMenuBoard(force = false) {
   }
 }
 refreshMenuBoard();
-
-if (account.token) {
-  apiCall('/me')
-    .then((r) => setAccount(account.token, r.user))
-    .catch((err) => err.status === 401 && setAccount(null, null));
-}
 
 // ------------------------------------------------------------------ events -> HUD/audio
 function handleEvents(events) {

@@ -1,4 +1,4 @@
-// Persistent storage for accounts, login sessions and the leaderboard.
+// Persistent storage for the ranked leaderboard.
 // The whole state is one small JSON document:
 //   - DATABASE_URL set  -> kept in Postgres (one row), survives redeploys on hosts like Render
 //   - otherwise         -> DATA_DIR/data.json (default ./data); fine locally, but wiped on hosts
@@ -6,7 +6,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-const EMPTY = () => ({ users: {}, sessions: {}, scores: {} });
+const EMPTY = () => ({ scores: [] });
 
 export async function openStore({ databaseUrl = process.env.DATABASE_URL, dataDir = process.env.DATA_DIR || 'data' } = {}) {
   const backend = databaseUrl ? await pgBackend(databaseUrl) : fileBackend(dataDir);

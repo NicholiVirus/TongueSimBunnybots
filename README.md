@@ -78,14 +78,13 @@ Auto-align (Space) also works at your **DEPOT** chutes: it parks you right under
 
 All robots are procedural placeholders for now. To drop in your team's CAD, see [`public/assets/robots/README.md`](public/assets/robots/README.md) — export a `.glb`, put it in `public/assets/robots/team/`, and set `model` on the `team` preset in `shared/robots.js`. Tune the preset's size, speed and elevator height to match the real robot.
 
-## Accounts, ranked runs and the leaderboard
+## Ranked runs and the leaderboard
 
-- **Register / log in** from the bar at the top of the main menu (username + password; passwords are stored as salted scrypt hashes). Logged-in drivers always play under their account name. Guests can still play practice and online rooms.
-- **🏆 Ranked Run** starts a solo match **on the server**: just your robot — no partners and no bots on the other alliance — with the default house rules. Only these runs count for the leaderboard, and because the server runs the match, scores can't be edited in the browser.
-- **Leaderboard**: the top 10 drivers show on the main menu for everyone (guests too); the full board has one board per scoring mechanism (Passthrough elevator, Hopper + separate elevator, Hopper front + elevator back, Intake-elevator + hopper) keeping each driver's best score with that mechanism, plus **Overall** with each driver's best on any mechanism.
-- **Removing scores:** only leaderboard admins see the ✕ buttons. Set admin usernames with the `LEADERBOARD_ADMINS` environment variable (comma-separated) or in `ADMINS` in `server/accounts.js` (currently `611_Nick`). Register that username yourself first so nobody else can claim it.
+- **🏆 Ranked Run** starts a solo match **on the server**: just your robot — no partners and no bots on the other alliance — with the default house rules. Only these runs count, and because the server runs the match, scores can't be edited in the browser. There are no accounts: each run is saved under the driver name typed in the menu.
+- **Leaderboard**: the top 10 runs show on the main menu for everyone; the full board ranks **every run** (no personal-best filtering) **Overall** and per scoring mechanism (Passthrough elevator, Hopper + separate elevator, Hopper front + elevator back, Intake-elevator + hopper). The #1 overall run is the global record.
+- **Removing runs:** set a secret `ADMIN_KEY` environment variable on the host. In the leaderboard, click **Admin** and enter that key to get ✕ buttons (the key is remembered on that device). Without `ADMIN_KEY`, nobody can remove runs.
 
-### Where accounts are saved
+### Where the leaderboard is saved
 
 - With `DATABASE_URL` set (any Postgres, e.g. Render Postgres, Neon or Supabase), everything is saved in one table (`hh_store`) and survives redeploys.
 - Without it, data goes to `data/data.json` (or `$DATA_DIR`). That is fine locally, but **on Render's free plan the disk is wiped on every deploy/restart** — use `DATABASE_URL` there (or a persistent disk mounted at `DATA_DIR`).

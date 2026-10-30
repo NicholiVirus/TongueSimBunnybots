@@ -842,21 +842,7 @@ ol.small li {
   line-height: 1.45;
 }
 
-/* ------------------------------------------------------------------ accounts + leaderboard */
-.account-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 8px 12px;
-  margin-bottom: 10px;
-}
-.account-bar b {
-  color: var(--accent-2);
-}
+/* ------------------------------------------------------------------ leaderboard */
 .btn.ranked {
   border-color: rgba(255, 216, 74, 0.5);
   background: linear-gradient(180deg, rgba(255, 216, 74, 0.16), rgba(255, 216, 74, 0.05));
@@ -885,20 +871,6 @@ ol.small li {
   color: #1a0d00;
   background: var(--accent);
   border-color: var(--accent);
-}
-.acct-form {
-  display: grid;
-  gap: 10px;
-  max-width: 360px;
-}
-.acct-form.login .reg-only {
-  display: none;
-}
-.acct-error {
-  color: #ff8a8c;
-  min-height: 1em;
-  margin: 0;
-  font-size: 13px;
 }
 .lb-wrap {
   max-height: 55vh;
