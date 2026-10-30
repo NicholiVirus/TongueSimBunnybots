@@ -82,7 +82,7 @@ All robots are procedural placeholders for now. To drop in your team's CAD, see 
 
 - **🏆 Ranked Run** starts a solo match **on the server**: just your robot — no partners and no bots on the other alliance — with the default house rules. Only these runs count, and because the server runs the match, scores can't be edited in the browser. There are no accounts: each run is saved under the driver name typed in the menu.
 - **Leaderboard**: the top 10 runs show on the main menu for everyone; the full board ranks **every run** (no personal-best filtering) **Overall** and per scoring mechanism (Passthrough elevator, Hopper + separate elevator, Hopper front + elevator back, Intake-elevator + hopper). The #1 overall run is the global record.
-- **Removing runs:** set a secret `ADMIN_KEY` environment variable on the host. In the leaderboard, click **Admin** and enter that key to get ✕ buttons (the key is remembered on that device). Without `ADMIN_KEY`, nobody can remove runs.
+- **Removing runs:** in the leaderboard, click **Admin** and enter the admin key to get ✕ buttons (the key is remembered on that device). The key is set in `server/leaderboard.js`; an `ADMIN_KEY` environment variable on the host overrides it.
 
 ### Where the leaderboard is saved
 

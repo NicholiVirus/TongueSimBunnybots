@@ -11,10 +11,11 @@ export const BOARDS = {
   elevIntake: 'Intake-elevator + hopper',
 };
 const KEEP = 100; // runs kept per mechanism
+const DEFAULT_ADMIN_KEY = 'TUNGTUNG'; // used when ADMIN_KEY isn't set on the host
 
 export class Leaderboard {
-  // adminKey: secret that lets the admin remove runs (ADMIN_KEY on the host); unset = nobody can
-  constructor(store, { adminKey = process.env.ADMIN_KEY } = {}) {
+  // adminKey: secret that lets the admin remove runs (ADMIN_KEY on the host, else DEFAULT_ADMIN_KEY)
+  constructor(store, { adminKey = process.env.ADMIN_KEY || DEFAULT_ADMIN_KEY } = {}) {
     this.store = store;
     this.adminKey = adminKey || null;
     delete store.doc.users; // left over from the old account system
