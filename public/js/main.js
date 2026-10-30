@@ -407,10 +407,12 @@ net.on('results', (msg) => {
 net.on('lobby', () => toLobby());
 net.on('ranked', (msg) => {
   const box = $('res-ranked');
-  box.innerHTML =
-    msg.overallRank === 1
-      ? `🏆 <b>NEW GLOBAL RECORD: ${msg.score}</b><br /><span class="small">#1 overall · #${msg.rank} on ${esc(msg.archName)}</span>`
-      : `<b>Ranked run saved: ${msg.score}</b><br /><span class="small">#${msg.overallRank} overall · #${msg.rank} on ${esc(msg.archName)}</span>`;
+  const where = `<span class="small">#${msg.overallRank} overall · #${msg.rank} on ${esc(msg.archName)}</span>`;
+  box.innerHTML = !msg.improved
+    ? `<b>Ranked run: ${msg.score}</b> — your entry with this robot stays at ${msg.best}<br />${where}`
+    : msg.overallRank === 1
+      ? `🏆 <b>NEW GLOBAL RECORD: ${msg.score}</b><br />${where}`
+      : `<b>Ranked run saved: ${msg.score}</b><br />${where}`;
   box.classList.remove('hidden');
   menuBoardAt = 0;
 });

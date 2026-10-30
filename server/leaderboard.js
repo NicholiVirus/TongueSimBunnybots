@@ -1,5 +1,6 @@
-// Ranked leaderboard: every ranked run is its own entry under the driver name typed in the menu
-// (no accounts). Boards list the highest runs overall and per scoring mechanism.
+// Ranked leaderboard: runs are saved under the driver name typed in the menu (no accounts).
+// A driver appears once per robot (drivetrain + full build) with their best run on it; the same
+// name can show up again only with a different robot. Boards: overall and per scoring mechanism.
 import crypto from 'node:crypto';
 import { sanitizeMods, ROBOTS } from '../shared/robots.js';
 
@@ -23,6 +24,10 @@ export class Leaderboard {
     const s = store.doc.scores;
     if (!Array.isArray(s)) store.doc.scores = s ? Object.values(s) : []; // older saves kept one per driver
     for (const e of store.doc.scores) e.id ??= crypto.randomUUID();
+    // older saves kept every run: keep only the best per driver + robot
+    const best = new Map();
+    for (const e of this.board('overall')) if (!best.has(slot(e))) best.set(slot(e), e);
+    store.doc.scores = [...best.values()];
   }
 
   get runs() {
@@ -39,6 +44,10 @@ export class Leaderboard {
   submit({ name, team, score, totals, robot, mods }) {
     const md = sanitizeMods(mods);
     const entry = { id: crypto.randomUUID(), name, team: cleanTeam(team), arch: md.mech, robot: ROBOTS[robot] ? robot : 'team', mods: md, score, totals, date: Date.now() };
+    const prev = this.runs.find((e) => slot(e) === slot(entry));
+    const improved = !prev || score > prev.score;
+    if (!improved) return { improved, best: prev.score, arch: md.mech, rank: this.rankOf(md.mech, prev.id), overallRank: this.rankOf('overall', prev.id) };
+    if (prev) this.store.doc.scores = this.runs.filter((e) => e !== prev);
     this.runs.push(entry);
     // trim each mechanism to its best KEEP runs
     const mine = this.board(md.mech);
@@ -47,7 +56,7 @@ export class Leaderboard {
       this.store.doc.scores = this.runs.filter((e) => !drop.has(e.id));
     }
     this.store.changed();
-    return { arch: md.mech, rank: this.rankOf(md.mech, entry.id), overallRank: this.rankOf('overall', entry.id) };
+    return { improved, best: score, arch: md.mech, rank: this.rankOf(md.mech, entry.id), overallRank: this.rankOf('overall', entry.id) };
   }
 
   board(board) {
@@ -68,6 +77,9 @@ export class Leaderboard {
     this.store.changed();
   }
 }
+
+// one leaderboard entry per driver name (any case) + drivetrain + build
+const slot = (e) => `${String(e.name).toLowerCase()}|${e.robot}|${JSON.stringify(sanitizeMods(e.mods))}`;
 
 const cleanTeam = (t) =>
   String(t ?? '')
