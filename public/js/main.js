@@ -49,7 +49,6 @@ try {
 const app = {
   session: null,
   room: null,
-  paused: false,
   resultsShown: false,
   overlayReturn: null,
 };
@@ -336,7 +335,6 @@ function beginMatchView() {
   const s = app.session;
   scene.setMatch(s.roster, s.you, settings.camera);
   app.rosterById = new Map(s.roster.map((r) => [r.id, r]));
-  app.paused = false;
   app.resultsShown = false;
   hud.lastPhase = null;
   hud.lastCount = null;
@@ -357,13 +355,12 @@ function quitToMenu() {
 
 function pause() {
   if (!inMatch()) return;
-  app.paused = app.session.local;
-  $('pause-note').textContent = app.session.local ? 'Practice is paused.' : 'Online match keeps running while this menu is open.';
+  // the match clock keeps running behind this menu (practice too); your robot just gets no input
+  $('pause-note').textContent = 'The match keeps running while this menu is open.';
   show('pause');
   input.enabled = false;
 }
 function resume() {
-  app.paused = false;
   show(null);
   input.enabled = true;
 }
@@ -693,12 +690,13 @@ let acc = 0;
 // 60 Hz sim/input ticks run on their own clock, not the render frame rate, so a slow GPU (or a
 // busy laptop) still sends exactly 60 inputs/s online and practice runs at real speed.
 let tickClock = performance.now();
+const tickBoundary = () => tickClock - acc * 1000; // time the last sim tick covers up to
 function pumpTicks() {
   const s = app.session;
   const now = performance.now();
   const dt = Math.max(0, Math.min(0.5, (now - tickClock) / 1000));
   tickClock = now;
-  if (!s || app.paused) return;
+  if (!s) return;
   acc += dt;
   if (acc < TICK) return;
   let n = 0;
@@ -740,7 +738,9 @@ function frame(now) {
   let view = null;
   if (s) {
     pumpTicks();
-    view = s.view(performance.now() / 1000, Math.min(1, acc / TICK));
+    // sample the match at this frame's display time (the rAF timestamp), not whenever this callback
+    // happens to run, so the robot moves the same distance every frame instead of stuttering
+    view = s.view(now / 1000, (now - tickBoundary()) / (TICK * 1000));
     if (view) {
       view.rosterById = app.rosterById;
       handleEvents(s.drainEvents());

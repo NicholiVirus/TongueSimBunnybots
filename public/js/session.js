@@ -123,9 +123,10 @@ export class LocalSession {
     this.events.push(...m.drainEvents());
   }
 
+  // alpha: ticks since the last one was simulated (can be slightly negative or above 1)
   view(_now, alpha) {
     const latest = this.interp.latest;
-    const v = this.interp.sample(latest.tk - 1 + alpha);
+    const v = this.interp.sample(latest.tk - 1 + Math.max(-2, Math.min(1, alpha)));
     return { ...v, snap: latest };
   }
 
@@ -289,7 +290,9 @@ export class NetSession {
     return { rtt: Math.round(this.net.rtt), delayMs: Math.round((this.delay / 60) * 1000), jitterMs: Math.round((this.jitter / 60) * 1000) };
   }
 
-  view(now) {
+  // alpha: ticks since your robot's last predicted tick (it's drawn moved on by its velocity for that
+  // fraction, so it glides between 60 Hz steps instead of stepping)
+  view(now, alpha = 0) {
     const latest = this.interp.latest;
     if (!latest) return null;
     const tk = now * 60 + (this.clock ?? 0) - this.delay;
@@ -301,9 +304,10 @@ export class NetSession {
       const le = latest.r.find((q) => q[0] === this.you);
       if (me && le) {
         Object.assign(me, robotFromArr(le));
-        me.x = this.pred.x + this.off.x;
-        me.y = this.pred.y + this.off.y;
-        me.th = this.pred.th + this.off.th;
+        const dt = Math.max(-1, Math.min(1.5, alpha)) * TICK;
+        me.x = this.pred.x + this.pred.vx * dt + this.off.x;
+        me.y = this.pred.y + this.pred.vy * dt + this.off.y;
+        me.th = this.pred.th + this.pred.w * dt + this.off.th;
         me.vx = this.pred.vx;
         me.vy = this.pred.vy;
         me.w = this.pred.w;
