@@ -91,7 +91,7 @@ All robots are procedural placeholders for now. To drop in your team's CAD, see 
 
 ## Hosting online
 
-The server is a single Node process (Express + `ws`). Matches live in memory; accounts and the leaderboard are saved as described above.
+The server is a single Node process (Express + `ws`). Matches live in memory; the leaderboard is saved as described above.
 
 - **LAN:** run `npm start` on one machine; others open `http://<that-machine's-IP>:3000`.
 - **Internet:** deploy to any Node host that supports WebSockets (Render, Railway, Fly.io…). Start command `npm start`; it listens on `$PORT`.
@@ -104,7 +104,7 @@ shared/   game logic used by BOTH server and browser
   sim.js      authoritative 60 Hz match sim: drive, collisions, pieces, scoring, fouls, RPs
   bot.js      A*-pathing bot drivers (fill empty slots, practice opponents)
   robots.js   robot presets (size, speed, elevator) + CAD hook
-server/   Express static host + WebSocket rooms (lobby, bots, 30 Hz snapshots), accounts + leaderboard API
+server/   Express static host + WebSocket rooms (lobby, bots, 30 Hz snapshots), leaderboard API
 public/   three.js client: field/robot rendering, HUD, menus, input, prediction
 test/     node --test suite (full 6-bot match, scoring, recirculation)
 ```
