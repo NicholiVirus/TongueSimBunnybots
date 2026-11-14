@@ -102,7 +102,8 @@ export const ROBOTS = {
     // the carpet to intake, tipped to the shelf for LEVEL 1 or down to the oven mouth
     // stow is also the hand-off pose where the beltdexer passes the next carrot into the arm; L1 is 15° off vertical.
     // grip: where the arm holds its carrot, [distance from the pivot (m), angle offset from the arm (deg)] (CAD rollers)
-    slap: { stow: 120, ground: -16, feed: 35, oven: 20, l1: 75, speed: 300, tolerance: 8, feedTime: 0.2, pivot: [0.031, 0.248], grip: [0.641, -6] },
+    // ground is as low as it goes without the intake dipping into the carpet; cad = the arm angle the CAD was drawn at
+    slap: { stow: 120, ground: -5, feed: 35, oven: 20, l1: 75, speed: 300, tolerance: 8, feedTime: 0.2, pivot: [0.031, 0.248], grip: [0.641, -6], cad: 110 },
     model: { url: '/assets/robots/526/robot526.glb', rig: 'r526' },
   },
   kitbot: {

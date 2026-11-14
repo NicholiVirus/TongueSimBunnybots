@@ -437,8 +437,8 @@ export class RobotView {
 
     const held = st.held || '';
     if (this.rigKind === 'r526') {
-      // the CAD has the intake upright (its stow angle); everything else is relative to that
-      this.rig.intake.rotation.z = (((st.arm ?? this.cfg.slap.stow) - this.cfg.slap.stow) * Math.PI) / 180;
+      // the CAD was drawn with the arm at slap.cad degrees; everything else is relative to that
+      this.rig.intake.rotation.z = (((st.arm ?? this.cfg.slap.stow) - this.cfg.slap.cad) * Math.PI) / 180;
       const S = this.cfg.slap;
       const inArm = st.flags & 8 ? 1 : 0; // the carrot held in the arm's rollers (scored next)
       const ga = (((st.arm ?? S.stow) + S.grip[1]) * Math.PI) / 180;
