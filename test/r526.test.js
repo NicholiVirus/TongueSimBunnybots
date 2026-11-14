@@ -16,7 +16,7 @@ const run = (m, s) => {
 
 test('team 526: real build, and the team number locks any robot to it', () => {
   const [, r] = solo(0, { mods: { maxLevel: 3, mech: 'passthrough' } });
-  assert.deepEqual(r.cfg.mods, { ground: true, depot: true, ramp: false, maxLevel: 1, mech: 'gtake' });
+  assert.deepEqual(r.cfg.mods, { ground: true, depot: true, ramp: true, maxLevel: 1, mech: 'gtake' });
   assert.equal(r.arm, r.cfg.slap.stow, 'intake starts upright');
   const m2 = new Match({ slots: [{ id: 'a', alliance: 'red', station: 1, robot: 'kitbot', team: '526', mods: { maxLevel: 3 } }] });
   assert.equal(m2.robots[0].cfg.mods.mech, 'gtake');
@@ -115,4 +115,24 @@ test('depot carrots go into the beltdexer from the back, opposite the intake', (
   m.setInput('a', {});
   run(m, 5);
   assert.equal(r.held.length, 3);
+});
+
+test('oven: intake stays up unless it has a carrot; ramp cakes caught over the back', () => {
+  const [m, r] = solo(0);
+  m.setInput('a', { sp: 'oven' });
+  run(m, 1);
+  assert.equal(r.arm, r.cfg.slap.stow, 'nothing aboard: stays up');
+  // ramp: back toward the oven's tag face
+  m.inv.red.rampCakes = 3;
+  r.x = F.OVEN.x0 - r.cfg.length / 2 - 0.3;
+  r.y = F.OVEN.yc;
+  r.th = 0;
+  m.setInput('a', { align: true });
+  run(m, 1.5);
+  assert.ok(Math.abs(Math.cos(r.th - Math.PI) - 1) < 0.01, 'auto-align backs up to the ramp');
+  m.setInput('a', { sp: 'oven' });
+  run(m, 6);
+  assert.equal(r.held.length, 3, 'three cakes');
+  assert.equal(r.carriage, 1, 'one handed up to the arm');
+  assert.ok(Math.abs(r.arm - r.cfg.slap.oven) < 2, 'with a piece in the arm it swings down to the oven pose');
 });

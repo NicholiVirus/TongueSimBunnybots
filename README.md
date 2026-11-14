@@ -108,6 +108,8 @@ Built from team 526's STEP export (`public/assets/robots/526/robot526.glb`). A *
 - **LEVEL 1:** press **1** — the arm tips to 15° off vertical — face the pantry and press **F**.
 - **Oven:** press **4** — the intake swings down to the mouth — and press **F**.
 - **Depot:** backs up to the chute (opposite the intake; Space aligns it) and the depot drops carrots into the beltdexer.
+- **Ramp:** backs up to the foot of the ramp and catches carrot cakes over the back (up to 3).
+- **Oven:** the intake stays up and only swings down to the mouth when it has a carrot in it.
 - LEVEL 1 max; the build is fixed. Typing team number **526** locks any robot to this build.
 
 To rebuild a model from a new STEP export: `pip install cadquery-ocp trimesh`, run `python3 tools/step_to_glb.py robot.step raw.glb 1.5 0.7 charles` (or `divebomb` / `526`), then `npx gltfpack -i raw.glb -o public/assets/robots/team/charles.glb -si 0.3 -cc -kn -km`. The script sorts parts into moving groups (elevator stage, carriage, arm, swerve wheels) by their names in the CAD tree. For a different team's CAD, see [`public/assets/robots/README.md`](public/assets/robots/README.md).

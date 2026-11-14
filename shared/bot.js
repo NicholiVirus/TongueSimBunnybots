@@ -533,7 +533,7 @@ export class Bot {
     const gx = s * (F.OVEN.x0 - r.cfg.length / 2 - 0.05);
     const v = r.cfg.maxSpeed * 0.55;
     if (m.timeLeft - Math.hypot(gx - r.x, F.OVEN.yc - r.y) / v - 8 < F.TIMING.endgame * 0.6) return null;
-    return { kind: 'ramp', goal: [gx, F.OVEN.yc], stage: [gx - s * 0.6, F.OVEN.yc], direct: true, heading: s > 0 ? 0 : Math.PI, since: m.time };
+    return { kind: 'ramp', goal: [gx, F.OVEN.yc], stage: [gx - s * 0.6, F.OVEN.yc], direct: true, heading: s > 0 !== !!r.cfg.rampRear ? 0 : Math.PI, since: m.time };
   }
 
   depotTask(m, r) {

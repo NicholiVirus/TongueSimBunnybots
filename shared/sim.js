@@ -175,7 +175,8 @@ export function alignTarget(r, alliance) {
     { kind: 'oven', x: mouthX, y: ob.y1 + half + 0.02, th: ovenBack ? Math.PI / 2 : -Math.PI / 2 },
     { kind: 'oven', x: mouthX, y: ob.y0 - half - 0.02, th: ovenBack ? -Math.PI / 2 : Math.PI / 2 },
     // foot of the RAMP (in front of the oven's tag face): where stored cakes roll down
-    { kind: 'ramp', x: s > 0 ? ob.x0 - half - 0.02 : ob.x1 + half + 0.02, y: F.OVEN.yc, th: s > 0 ? 0 : Math.PI },
+    // (a robot that loads over its back, like 526, backs up to it)
+    { kind: 'ramp', x: s > 0 ? ob.x0 - half - 0.02 : ob.x1 + half + 0.02, y: F.OVEN.yc, th: s > 0 !== !!r.cfg.rampRear ? 0 : Math.PI },
     // DEPOT chutes in our FARM: park right under the 23" mouth, hopper toward the wall
     ...F.depotChutes(alliance).map((c) => ({
       kind: 'depot',
@@ -597,8 +598,8 @@ export class Match {
     // (526 scores through its intake: when not intaking it holds the pose for the chosen target, e.g. L1 / oven;
     // with an empty arm it goes back to the hand-off pose so the beltdexer can pass it the next carrot)
     const gtake = r.cfg.mods.mech === 'gtake';
-    const reload = gtake && !r.carriage && r.held.length;
-    const rest = !reload && S[r.elevTarget] !== undefined && r.elevTarget !== 'ground' ? r.elevTarget : 'stow';
+    // the arm stays up at the hand-off pose unless it has a carrot to score (then it goes to the L1 / oven pose)
+    const rest = (!gtake || r.carriage) && S[r.elevTarget] !== undefined && r.elevTarget !== 'ground' ? r.elevTarget : 'stow';
     const want = feeding ? 'feed' : wantDown ? 'ground' : rest;
     r.arm += clamp(S[want] - r.arm, -S.speed * dt, S.speed * dt);
     r.grab = wantDown && !feeding && r.arm <= S.ground + S.tolerance;
