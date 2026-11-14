@@ -1,5 +1,5 @@
 import { TICK } from '/shared/sim.js';
-import { ROBOTS, ROBOT_IDS, getRobotConfig, sanitizeMods, modsLabel, randomMods, MECHS, TEAM_LOCKS } from '/shared/robots.js';
+import { ROBOTS, ROBOT_IDS, getRobotConfig, sanitizeMods, modsLabel, randomMods, MECHS, TEAM_LOCKS, buildFor } from '/shared/robots.js';
 import { SceneView } from './render/scene.js';
 import { Input } from './input.js';
 import { Hud, renderResults } from './hud.js';
@@ -79,12 +79,15 @@ updateBlurb();
 // mechanism configuration
 const readMods = () => sanitizeMods({ ground: $('cfg-ground').checked, depot: $('cfg-depot').checked, ramp: $('cfg-ramp').checked, maxLevel: Number($('cfg-level').value), mech: $('cfg-mech').value });
 const CFG_IDS = ['cfg-ground', 'cfg-depot', 'cfg-ramp', 'cfg-level', 'cfg-mech'];
+// a robot preset (Charles) or a team number (e.g. 526) can come with a fixed build
+const buildLock = () => ROBOTS[robotSel.value]?.build || TEAM_LOCKS[$('in-team').value.trim()] || null;
 const writeMods = (m) => {
-  // some team numbers come with a locked build (e.g. 526)
-  const lock = TEAM_LOCKS[$('in-team').value.trim()];
+  const lock = buildLock();
   for (const id of CFG_IDS) $(id).disabled = !!lock;
   const md = sanitizeMods(lock || m);
-  if (lock && ![...$('cfg-mech').options].some((o) => o.value === md.mech)) $('cfg-mech').add(new Option(`Team ${$('in-team').value.trim()} build (locked)`, md.mech));
+  for (const o of [...$('cfg-mech').options]) if (!MECHS[o.value]) o.remove(); // locked-only mechanisms from an earlier pick
+  if (lock && !MECHS[md.mech])
+    $('cfg-mech').add(new Option(ROBOTS[robotSel.value]?.build ? `${ROBOTS[robotSel.value].name} — real robot build (locked)` : `Team ${$('in-team').value.trim()} build (locked)`, md.mech));
   $('cfg-ground').checked = md.ground;
   $('cfg-depot').checked = md.depot;
   $('cfg-ramp').checked = md.ramp;
@@ -95,6 +98,7 @@ const writeMods = (m) => {
 writeMods(settings.mods);
 for (const id of ['cfg-ground', 'cfg-depot', 'cfg-ramp', 'cfg-level', 'cfg-mech']) {
   $(id).addEventListener('change', () => {
+    if (buildLock()) return;
     settings.mods = readMods();
     saveSettings();
     writeMods(settings.mods);
@@ -105,7 +109,7 @@ const profile = () => ({
   name: $('in-name').value.trim() || 'Driver',
   team: $('in-team').value.replace(/\D/g, '').slice(0, 5) || DEFAULT_TEAM,
   robot: robotSel.value,
-  mods: TEAM_LOCKS[$('in-team').value.trim()] ? settings.mods : readMods(),
+  mods: buildLock() ? sanitizeMods(MECHS[settings.mods?.mech] ? settings.mods : null) : readMods(),
 });
 for (const el of [$('in-name'), $('in-team'), robotSel]) {
   el.addEventListener('change', () => {
@@ -115,7 +119,7 @@ for (const el of [$('in-name'), $('in-team'), robotSel]) {
     writeMods(settings.mods);
     if (net.connected) {
       sendHello();
-      net.send({ t: 'robot', robot: robotSel.value, mods: readMods() });
+      net.send({ t: 'robot', robot: robotSel.value, mods: profile().mods });
     }
   });
 }
@@ -214,16 +218,16 @@ const actions = {
   'fill-bots': () => net.send({ t: 'fillBots' }),
   start: () => net.send({ t: 'start' }),
   'take-slot': (b) => net.send({ t: 'slot', slot: b.dataset.slot }),
-  'add-bot': (b) => net.send({ t: 'bot', slot: b.dataset.slot, add: true, robot: ['team', 'speedy', 'tank'][Math.floor(Math.random() * 3)] }),
+  'add-bot': (b) => net.send({ t: 'bot', slot: b.dataset.slot, add: true, robot: POOL[Math.floor(Math.random() * POOL.length)] }),
   'remove-bot': (b) => net.send({ t: 'bot', slot: b.dataset.slot, add: false }),
   kick: (b) => net.send({ t: 'kick', pid: b.dataset.pid }),
 };
 
 // ------------------------------------------------------------------ practice bot builds
-const POOL = ['team', 'speedy', 'tank'];
+const POOL = ['team', 'kitbot', 'speedy', 'tank'];
 const randomBots = () => ({
-  ally: [0, 1].map(() => ({ robot: POOL[Math.floor(Math.random() * 3)], mods: randomMods() })),
-  opp: [0, 1, 2].map(() => ({ robot: POOL[Math.floor(Math.random() * 3)], mods: randomMods() })),
+  ally: [0, 1].map(() => ({ robot: POOL[Math.floor(Math.random() * POOL.length)], mods: randomMods() })),
+  opp: [0, 1, 2].map(() => ({ robot: POOL[Math.floor(Math.random() * POOL.length)], mods: randomMods() })),
 });
 let practiceBots = randomBots();
 
@@ -238,7 +242,8 @@ function renderBotRows() {
   ];
   if (!rows.length) box.innerHTML = '<p class="muted small">No bots — solo practice.</p>';
   for (const { b, label, a } of rows) {
-    const md = sanitizeMods(b.mods);
+    const md = buildFor(b.robot, '', b.mods);
+    const fixed = !!ROBOTS[b.robot]?.build; // Charles plays its real build
     const row = document.createElement('div');
     row.className = `bot-row ${a}`;
     const opt = (v, t, sel) => `<option value="${v}" ${sel ? 'selected' : ''}>${esc(t)}</option>`;
@@ -246,7 +251,7 @@ function renderBotRows() {
       <div class="top"><b>${label}</b>
         <select data-k="robot">${ROBOT_IDS.map((id) => opt(id, ROBOTS[id].name, id === b.robot)).join('')}</select>
         <button class="btn tiny ghost" data-k="dice" title="Random build">🎲</button></div>
-      <details><summary>${esc(modsLabel(md))}</summary>
+      <details ${fixed ? 'class="fixed"' : ''}><summary>${esc(modsLabel(md))}${fixed ? ' 🔒' : ''}</summary>
         <div class="config-grid">
           <label class="check"><input type="checkbox" data-k="ground" ${md.ground ? 'checked' : ''}/> Ground intake</label>
           <label class="check"><input type="checkbox" data-k="depot" ${md.depot ? 'checked' : ''}/> Depot intake</label>
@@ -259,13 +264,13 @@ function renderBotRows() {
     row.addEventListener('change', (e) => {
       const k = e.target.dataset.k;
       if (k === 'robot') b.robot = e.target.value;
-      else if (k) b.mods = sanitizeMods({ ...md, [k]: e.target.type === 'checkbox' ? e.target.checked : k === 'maxLevel' ? Number(e.target.value) : e.target.value });
+      else if (k && !fixed) b.mods = sanitizeMods({ ...md, [k]: e.target.type === 'checkbox' ? e.target.checked : k === 'maxLevel' ? Number(e.target.value) : e.target.value });
       const open = row.querySelector('details').open;
       renderBotRows();
       if (open) box.children[rows.findIndex((r) => r.b === b)]?.querySelector('details')?.setAttribute('open', '');
     });
     row.querySelector('[data-k="dice"]').addEventListener('click', () => {
-      b.robot = POOL[Math.floor(Math.random() * 3)];
+      b.robot = POOL[Math.floor(Math.random() * POOL.length)];
       b.mods = randomMods();
       renderBotRows();
     });
@@ -494,7 +499,9 @@ function renderLobby(room) {
       robotSel.value = sel.value;
       settings.robot = sel.value;
       saveSettings();
-      net.send({ t: 'robot', robot: sel.value, mods: readMods() });
+      writeMods(settings.mods);
+      updateBlurb();
+      net.send({ t: 'robot', robot: sel.value, mods: profile().mods });
     });
   }
   const ar = $('lobby-autoramp');

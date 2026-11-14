@@ -56,7 +56,7 @@ Simplifications: pieces are scored when your robot is lined up at the right elev
 
 ## Robot configuration
 
-Under **Mechanisms** on the main menu (saved per browser, shown to everyone in the lobby):
+Under **Mechanisms** on the main menu (saved per browser, shown to everyone in the lobby) — for the **Custom robot**, **Speedy Swerve** and **Heavy Hauler** presets; Charles always plays its real build:
 
 | Option | Effect |
 | --- | --- |
@@ -78,9 +78,17 @@ Auto-align (Space) also works at your **DEPOT** chutes: it parks you right under
 
 - **Team 526** — locked build (the Mechanisms menu greys out): max **LEVEL 1**, the **elevator is the ground intake** (holds one piece and scores it on L1 or in the OVEN), and a separate **hopper fed only by the DEPOT/RAMP** that can only dump into the OVEN.
 
-## Your robot's CAD
+## Charles — team 611's robot
 
-All robots are procedural placeholders for now. To drop in your team's CAD, see [`public/assets/robots/README.md`](public/assets/robots/README.md) — export a `.glb`, put it in `public/assets/robots/team/`, and set `model` on the `team` preset in `shared/robots.js`. Tune the preset's size, speed and elevator height to match the real robot.
+The default robot (**Charles (611)**) is the team's real 2026 robot: the 3D model is built from its CAD (`public/assets/robots/team/charles.glb`), and it plays the way the real one does — numbers come from the CAD and the robot code. Its build is fixed, so the Mechanisms menu is locked while it's selected.
+
+- **Roller claw** on an arm + 2-stage elevator: holds **one** piece. Hold **Shift** and the arm folds down past the front bumper to grab a piece off the carpet (elevator must be down); it then stows upright with the piece locked in. It also catches **one** cake at a time at the foot of the RAMP.
+- **Shelves:** raise to L1/L2/L3 (21" / 33" / 48" of travel), face the PANTRY, press **F** — the arm tips forward and places the claw's piece. The claw can also feed the OVEN from the front.
+- **Trader** (rear hopper): takes up to 3 carrots from the DEPOT (back the trader up to the chute) and fires them into the OVEN **out the back** in well under a second. Auto-align (Space) turns the right end toward the oven/depot for you.
+- 3 pieces total aboard (G14): e.g. 2 carrots in the trader + 1 piece in the claw.
+- Bots can drive Charles too. **Custom robot**, **Speedy Swerve** and **Heavy Hauler** are still procedural placeholders with configurable mechanisms.
+
+To rebuild the model from a new STEP export: `pip install cadquery-ocp trimesh`, run `python3 tools/step_to_glb.py robot.step raw.glb`, then `npx gltfpack -i raw.glb -o public/assets/robots/team/charles.glb -si 0.3 -cc -kn -km`. The script sorts parts into moving groups (elevator stage, carriage, arm, swerve wheels) by their names in the CAD tree. For a different team's CAD, see [`public/assets/robots/README.md`](public/assets/robots/README.md).
 
 ## Ranked runs and the leaderboard
 

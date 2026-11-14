@@ -10,7 +10,23 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const lerpAngle = (a, b, t) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * t;
 
 function robotFromArr(e) {
-  return { id: e[0], x: e[1], y: e[2], th: e[3], elev: e[4], held: e[5], flags: e[6], vx: e[7], vy: e[8], w: e[9], ack: e[10], elevTarget: e[11], rampWait: e[12] || 0, rampReq: e[13] || 0 };
+  return {
+    id: e[0],
+    x: e[1],
+    y: e[2],
+    th: e[3],
+    elev: e[4],
+    held: e[5],
+    flags: e[6],
+    vx: e[7],
+    vy: e[8],
+    w: e[9],
+    ack: e[10],
+    elevTarget: e[11],
+    rampWait: e[12] || 0,
+    rampReq: e[13] || 0,
+    arm: e[14] || 0,
+  };
 }
 function pieceFromArr(e) {
   return { id: e[0], type: e[1] === 'k' ? 'cake' : 'carrot', st: e[2], x: e[3], y: e[4], z: e[5], th: e[6], roll: e[7] };
@@ -56,6 +72,7 @@ class Interp {
       r.y = lerp(a[2], e[2], t);
       r.th = lerpAngle(a[3], e[3], t);
       r.elev = lerp(a[4], e[4], t);
+      r.arm = lerp(a[14] || 0, e[14] || 0, t);
       robots.set(e[0], r);
     }
     const p0 = new Map(s0.p.map((e) => [e[0], e]));
@@ -90,7 +107,7 @@ export class LocalSession {
     const { alliance, station, robot, mods, name, team, allies, opps, skill } = this.opts;
     const other = alliance === 'red' ? 'blue' : 'red';
     const slots = [{ id: `${alliance}${station}`, alliance, station, robot, mods, name, team }];
-    const pool = ['team', 'speedy', 'tank'];
+    const pool = ['kitbot', 'speedy', 'tank'];
     const allyStations = [1, 2, 3].filter((s) => s !== station).slice(0, allies);
     // per-bot robot + mechanisms from the practice menu; anything unset gets a random build (kept across restarts)
     const bots = (this.opts.bots ??= { ally: [], opp: [] });
@@ -210,7 +227,7 @@ export class NetSession {
   }
 
   reconcile(e, s) {
-    const base = { cfg: this.cfg, alliance: this.me.alliance, x: e[1], y: e[2], th: e[3], elev: e[4], elevTarget: e[11], vx: e[7], vy: e[8], w: e[9] };
+    const base = { cfg: this.cfg, alliance: this.me.alliance, ovenRear: !!(e[6] & 128), x: e[1], y: e[2], th: e[3], elev: e[4], elevTarget: e[11], vx: e[7], vy: e[8], w: e[9] };
     const ack = e[10];
     this.pending = this.pending.filter((p) => p.seq > ack);
     for (const p of this.pending) this.predictStep(base, p.inp, this.enabledFor(p.inp, s, e));

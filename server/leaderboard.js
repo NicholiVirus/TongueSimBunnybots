@@ -6,6 +6,7 @@ import { sanitizeMods, ROBOTS } from '../shared/robots.js';
 
 export const BOARDS = {
   overall: 'Overall',
+  claw: 'Roller claw + trader (Charles)',
   passthrough: 'Passthrough elevator',
   separate: 'Hopper + separate elevator',
   opposite: 'Hopper front + elevator back',

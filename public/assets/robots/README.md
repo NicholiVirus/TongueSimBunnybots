@@ -1,6 +1,6 @@
 # Dropping in your robot CAD
 
-Every robot currently renders as a procedural **placeholder** (swerve base, bumpers, 2-stage elevator, roller intake). Physics never uses the mesh — only the numbers in `shared/robots.js` — so swapping in CAD is purely visual.
+The `team` preset is **Charles**, team 611's robot: `team/charles.glb` is generated from its STEP export by `tools/step_to_glb.py` + `gltfpack` (see the main README) and animated by the `charles` rig in `public/js/render/robot.js`. The other presets render as procedural **placeholders** (swerve base, bumpers, 2-stage elevator, roller intake). Physics never uses the mesh — only the numbers in `shared/robots.js` — so swapping in CAD is purely visual. The steps below are for dropping a simple, single-piece model onto another preset.
 
 ## 1. Export a `.glb`
 

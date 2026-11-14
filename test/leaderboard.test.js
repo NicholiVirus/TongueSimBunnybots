@@ -33,7 +33,7 @@ test('one entry per driver + robot (best run); only the admin key removes runs',
 });
 
 test('saved duplicates collapse to the best run per driver + robot', () => {
-  const e = (score) => ({ name: 'a', score, robot: 'team', mods: { mech: 'passthrough' }, arch: 'passthrough', date: score });
+  const e = (score) => ({ name: 'a', score, robot: 'kitbot', mods: { mech: 'passthrough' }, arch: 'passthrough', date: score });
   const lb = new Leaderboard({ doc: { scores: [e(5), e(9), e(7)] }, changed() {} }, {});
   assert.deepEqual(
     lb.board('overall').map((x) => x.score),
@@ -52,7 +52,7 @@ test('ranked rooms are solo, locked, and report the final score', () => {
   let reported = null;
   const room = new Room('TEST', { isPublic: false, ranked: true, onResult: (r, m) => (reported = m) });
   const sent = [];
-  const player = { id: 'p1', name: 'alice', team: '611', robot: 'team', mods: { mech: 'separate' }, send: (o) => sent.push(o), sendRaw: (j) => sent.push(JSON.parse(j)) };
+  const player = { id: 'p1', name: 'alice', team: '611', robot: 'kitbot', mods: { mech: 'separate' }, send: (o) => sent.push(o), sendRaw: (j) => sent.push(JSON.parse(j)) };
   room.add(player);
   room.handle(player, { t: 'fillBots' });
   room.handle(player, { t: 'settings', officialRules: true });

@@ -2,7 +2,7 @@
 // (online play) and in the browser (offline practice). Fixed 60 Hz step.
 
 import * as F from './field.js';
-import { getRobotConfig, isOneAtATime, reloadsFromHopper, shelfSide, effectiveMods } from './robots.js';
+import { getRobotConfig, isOneAtATime, reloadsFromHopper, shelfSide, buildFor, hasGripper, hasRearTrader, clawPose } from './robots.js';
 
 export const TICK = 1 / 60;
 
@@ -169,12 +169,18 @@ export function alignTarget(r, alliance) {
   const mouthX = (s * (F.OVEN.mouthX0 + F.OVEN.mouthX1)) / 2;
   const cands = [
     { kind: 'pantry', x: clamp(r.x, pb.x0 + 0.2, pb.x1 - 0.2), y: F.PANTRY.yFront - half - 0.01, th: shelfSide(r.cfg.mods) > 0 ? Math.PI / 2 : -Math.PI / 2 },
-    { kind: 'oven', x: mouthX, y: ob.y1 + half + 0.02, th: -Math.PI / 2 },
-    { kind: 'oven', x: mouthX, y: ob.y0 - half - 0.02, th: Math.PI / 2 },
+    // (a rear trader with carrots aboard backs up to the mouth instead)
+    { kind: 'oven', x: mouthX, y: ob.y1 + half + 0.02, th: r.ovenRear ? Math.PI / 2 : -Math.PI / 2 },
+    { kind: 'oven', x: mouthX, y: ob.y0 - half - 0.02, th: r.ovenRear ? -Math.PI / 2 : Math.PI / 2 },
     // foot of the RAMP (in front of the oven's tag face): where stored cakes roll down
     { kind: 'ramp', x: s > 0 ? ob.x0 - half - 0.02 : ob.x1 + half + 0.02, y: F.OVEN.yc, th: s > 0 ? 0 : Math.PI },
     // DEPOT chutes in our FARM: park right under the 23" mouth, hopper toward the wall
-    ...F.depotChutes(alliance).map((c) => ({ kind: 'depot', x: c.x + c.dx * (half + 0.05), y: c.y + c.dy * (half + 0.05), th: Math.atan2(-c.dy, -c.dx) })),
+    ...F.depotChutes(alliance).map((c) => ({
+      kind: 'depot',
+      x: c.x + c.dx * (half + 0.05),
+      y: c.y + c.dy * (half + 0.05),
+      th: hasRearTrader(r.cfg.mods) ? Math.atan2(c.dy, c.dx) : Math.atan2(-c.dy, -c.dx),
+    })),
   ];
   let best = null;
   let bd = 2.6;
@@ -304,7 +310,7 @@ export class Match {
     this.tick = 0;
 
     for (const s of slots) {
-      const cfg = getRobotConfig(s.robot, effectiveMods(s.team, s.mods));
+      const cfg = getRobotConfig(s.robot, buildFor(s.robot, s.team, s.mods));
       const p = F.startPose(s.alliance, s.station);
       this.robots.push({
         id: s.id,
@@ -323,6 +329,7 @@ export class Match {
         w: 0,
         elev: cfg.elevator.min,
         elevTarget: 'stow',
+        arm: cfg.arm?.stow ?? 0, // claw arm angle (deg)
         held: [],
         intake: false,
         input: { mx: 0, my: 0, rot: 0 },
@@ -493,15 +500,19 @@ export class Match {
     if (en && inp.intake && !mods.ground) this.denied(r, 'This robot has no ground intake — use the DEPOT or RAMP');
 
     // separate hopper + elevator: the carriage carries one piece and reloads at the bottom
-    if (mods.mech === 'elevIntake') {
-      // the elevator is the ground intake: it holds one piece (always the last in `held`)
+    if (hasGripper(mods)) {
+      // the end effector is the ground intake: it holds one piece (always the last in `held`)
       if (r.carriagePiece && !r.held.includes(r.carriagePiece)) r.carriagePiece = null;
       r.carriage = r.carriagePiece ? 1 : 0;
       if (r.intake && r.carriagePiece) {
         r.intake = false;
-        if (inp.intake) this.denied(r, 'Elevator already holds a piece — score it on L1 or in the OVEN');
+        if (inp.intake) this.denied(r, mods.mech === 'claw' ? 'Claw already holds a piece — score it first' : 'Elevator already holds a piece — score it on L1 or in the OVEN');
       }
+      // a rear trader with carrots aboard backs up to the oven (also steers auto-align)
+      r.ovenRear = hasRearTrader(mods) && r.held.length > r.carriage;
     }
+    r.grab = r.intake;
+    if (r.cfg.arm) this.updateArm(r, inp, en, dt);
     if (reloadsFromHopper(mods)) {
       r.carriage = Math.min(r.carriage || 0, r.held.length);
       if (!r.carriage && r.held.length && r.elev <= e.min + 0.04) {
@@ -520,10 +531,39 @@ export class Match {
     collideRobotStatic(r);
 
     if (!en) return;
-    if (inp.score && this.time - r.lastScore >= r.cfg.scoreCooldown && r.held.length) this.tryScore(r);
+    // (a claw robot keeps trying for a moment after a quick tap, while its arm swings into place)
+    if (inp.score) r.scoreLatch = this.time + 0.35;
+    const wantScore = inp.score || (r.cfg.arm && this.time < (r.scoreLatch || 0));
+    if (wantScore && this.time - r.lastScore >= r.cfg.scoreCooldown && r.held.length && this.tryScore(r)) r.scoreLatch = 0;
     if (inp.eject && !r.prevEject && r.held.length) this.eject(r);
     r.prevEject = !!inp.eject;
     if (r.tongue) this.tongueSlide(r, dt);
+  }
+
+  // CLAW ARM: stows upright, folds down to the floor to intake, tips forward to score.
+  updateArm(r, inp, en, dt) {
+    const A = r.cfg.arm;
+    const e = r.cfg.elevator;
+    if ((r.poseUntil || 0) < this.time) r.pose = null;
+    let want = 'stow';
+    if (r.tongue) want = 'tongue';
+    else if (r.intake) {
+      want = 'ground';
+      if (r.elevTarget !== 'stow') r.elevTarget = 'stow'; // the claw only reaches the floor with the elevator down
+    } else if (r.pose) want = r.pose;
+    else if (!r.carriagePiece && en && (r.rampAligned || r.rampWait > 0 || this.incoming(r, 'ramp') > 0)) want = 'ramp';
+    r.arm += clamp(A[want] - r.arm, -A.speed * dt, A.speed * dt);
+    // pieces are only grabbed once the claw is actually down
+    r.grab = r.intake && r.arm <= A.ground + A.tolerance && r.elev <= e.min + 0.08;
+  }
+
+  // ask the arm for a scoring pose; true once it's there
+  armReady(r, pose) {
+    const A = r.cfg.arm;
+    if (!A) return true;
+    r.pose = pose;
+    r.poseUntil = this.time + 0.3;
+    return Math.abs(r.arm - A[pose]) <= A.tolerance;
   }
 
   // Pieces in front of the tongue get dragged sideways with the robot: scored pieces slide along the
@@ -634,14 +674,26 @@ export class Match {
     return [r.x + Math.cos(r.th) * d, r.y + Math.sin(r.th) * d];
   }
 
-  heldWorldPos(r, i) {
-    const back = -0.12;
+  heldWorldPos(r, i, inClaw = false) {
+    let back = -0.12;
+    let z = r.elev + i * HOLD_SPACING;
+    if (r.cfg.arm) {
+      // claw robots: the piece is either in the claw or riding in the rear trader
+      const lp = inClaw ? clawPose(r.cfg, r.elev, r.arm) : r.cfg.trader;
+      back = lp.x;
+      z = lp.z;
+    }
     return {
       x: r.x + Math.cos(r.th) * back,
       y: r.y + Math.sin(r.th) * back,
-      z: r.elev + i * HOLD_SPACING,
+      z,
       th: r.th + Math.PI / 2,
     };
+  }
+
+  rearPoint(r, extra = 0) {
+    const d = r.cfg.length / 2 + extra;
+    return [r.x - Math.cos(r.th) * d, r.y - Math.sin(r.th) * d];
   }
 
   tryScore(r) {
@@ -665,13 +717,15 @@ export class Match {
         if (r.elevTarget === k && Math.abs(r.elev - e.setpoints[k]) <= e.tolerance) level = i;
       });
       if (level < 0) return this.denied(r, 'Raise the elevator to L1/L2/L3');
-      if (isOneAtATime(r.cfg.mods) && !r.carriage) return this.denied(r, 'Carriage empty — stow (R) to reload from the hopper');
+      if (isOneAtATime(r.cfg.mods) && !r.carriage)
+        return this.denied(r, r.cfg.mods.mech === 'claw' ? 'Claw is empty — only the claw reaches the shelves' : 'Carriage empty — stow (R) to reload from the hopper');
       const shelf = this.pantry[a][level];
       const xs = this.shelfXs(a, level);
       if (shelfFit(xs, ex, a) === null) return this.denied(r, `LEVEL ${level + 1} is full`);
       const px = shelfFit(xs, ex, a, 0.12);
       if (px === null) return this.denied(r, 'No room there — slide left/right to a gap');
-      const p = r.cfg.mods.mech === 'elevIntake' ? this.popHeldId(r, r.carriagePiece) : this.popHeld(r, 'cake');
+      if (!this.armReady(r, 'pantry')) return false; // arm still swinging out
+      const p = hasGripper(r.cfg.mods) ? this.popHeldId(r, r.carriagePiece) : this.popHeld(r, 'cake');
       shelf.push(p.id);
       const to = { x: px, y: (F.PANTRY.yFront + F.PANTRY.yBack) / 2 + 0.005, z: F.PANTRY.shelfZ[level], th: 0 };
       this.startPlace(p, r, to, 'pantry', 0.22);
@@ -692,23 +746,47 @@ export class Match {
     }
 
     // ---- OVEN (own alliance only)
-    if (r.elev <= e.setpoints.oven + e.tolerance) {
-      const ob = F.ovenBox(a);
-      const s = F.sideSign(a);
-      const mx0 = Math.min(F.OVEN.mouthX0 * s, F.OVEN.mouthX1 * s);
-      const mx1 = Math.max(F.OVEN.mouthX0 * s, F.OVEN.mouthX1 * s);
-      // only the two side mouths take pieces; the front (AprilTag) face is a solid panel —
-      // that's where robots wait to catch cakes from the RAMP, not a place to score
-      const faces = [
-        { ok: fx > mx0 - 0.1 && fx < mx1 + 0.1 && Math.abs(fy - ob.y1) < 0.25, n: [0, -1] },
-        { ok: fx > mx0 - 0.1 && fx < mx1 + 0.1 && Math.abs(fy - ob.y0) < 0.25, n: [0, 1] },
-      ];
-      for (const f of faces) {
-        if (!f.ok) continue;
-        if (fwdX * f.n[0] + fwdY * f.n[1] < Math.cos((40 * Math.PI) / 180)) continue;
-        // a 526 hopper dumps its own pieces first; the elevator's piece goes last
-        const hopper = r.cfg.mods.mech === 'elevIntake' ? r.held.filter((id) => id !== r.carriagePiece) : null;
-        const p = hopper?.length ? this.popHeldId(r, hopper.find((id) => this.pieces.find((q) => q.id === id)?.type === 'carrot') ?? hopper[hopper.length - 1]) : this.popHeld(r, 'carrot');
+    const ob = F.ovenBox(a);
+    const s = F.sideSign(a);
+    const mx0 = Math.min(F.OVEN.mouthX0 * s, F.OVEN.mouthX1 * s);
+    const mx1 = Math.max(F.OVEN.mouthX0 * s, F.OVEN.mouthX1 * s);
+    const trader = hasRearTrader(r.cfg.mods);
+    const low = r.elev <= e.setpoints.oven + e.tolerance;
+    // only the two side mouths take pieces; the front (AprilTag) face is a solid panel —
+    // that's where robots wait to catch cakes from the RAMP, not a place to score
+    const mouths = [
+      { y: ob.y1, n: [0, -1] },
+      { y: ob.y0, n: [0, 1] },
+    ];
+    // side +1: the front of the robot at the mouth (claw / elevator). side -1: a rear trader backed up to it
+    for (const side of trader ? [1, -1] : [1]) {
+      const [px, py] = side > 0 ? [fx, fy] : this.rearPoint(r);
+      for (const f of mouths) {
+        if (!(px > mx0 - 0.1 && px < mx1 + 0.1 && Math.abs(py - f.y) < 0.25)) continue;
+        if ((fwdX * f.n[0] + fwdY * f.n[1]) * side < Math.cos((40 * Math.PI) / 180)) continue;
+        let p;
+        if (trader) {
+          const hopper = r.held.filter((id) => id !== r.carriagePiece);
+          if (side < 0) {
+            if (!hopper.length) return this.denied(r, 'Trader is empty — the claw scores out the FRONT');
+            p = this.popHeldId(r, hopper[hopper.length - 1]);
+            const [bx, by] = this.rearPoint(r, -0.1);
+            Object.assign(p, { x: bx, y: by, z: r.cfg.trader.z });
+            r.lastScore = this.time - r.cfg.scoreCooldown + r.cfg.traderRate; // the trader fires fast
+          } else {
+            if (!r.carriagePiece) return this.denied(r, 'Turn around — the trader fires carrots out the BACK');
+            if (!low) return this.denied(r, 'Lower the elevator to feed the OVEN');
+            if (!this.armReady(r, 'oven')) return false;
+            p = this.popHeldId(r, r.carriagePiece);
+            r.lastScore = this.time;
+          }
+        } else {
+          if (!low) continue;
+          // a 526 hopper dumps its own pieces first; the elevator's piece goes last
+          const hopper = r.cfg.mods.mech === 'elevIntake' ? r.held.filter((id) => id !== r.carriagePiece) : null;
+          p = hopper?.length ? this.popHeldId(r, hopper.find((id) => this.pieces.find((q) => q.id === id)?.type === 'carrot') ?? hopper[hopper.length - 1]) : this.popHeld(r, 'carrot');
+          r.lastScore = this.time;
+        }
         const to = { x: (mx0 + mx1) / 2, y: F.OVEN.yc, z: 0.2, th: 0 };
         this.startPlace(p, r, to, 'oven', 0.3);
         p.owner = a;
@@ -716,7 +794,6 @@ export class Match {
         this.emit({ type: 'score', alliance: a, pts, label: `OVEN ${p.type === 'cake' ? 'CAKE' : 'CARROT'}`, x: to.x, y: to.y, z: 0.6, robot: r.id });
         if (p.type === 'carrot') this.score[a].ovenCarrot++;
         else this.score[a].ovenCake++;
-        r.lastScore = this.time;
         this.afterScore(r);
         return true;
       }
@@ -733,7 +810,9 @@ export class Match {
   }
 
   afterScore(r) {
-    if (r.held.length === 0 && r.input.autoStow !== false) r.elevTarget = 'stow';
+    // (a claw robot's elevator only serves the claw: trader carrots don't keep it up)
+    const empty = r.cfg.arm ? !r.carriagePiece : r.held.length === 0;
+    if (empty && r.input.autoStow !== false) r.elevTarget = 'stow';
   }
 
   // final x of every piece on a shelf (including ones still sliding into place)
@@ -747,16 +826,17 @@ export class Match {
   popHeldId(r, id) {
     const i = r.held.indexOf(id);
     const [pid] = r.held.splice(i < 0 ? r.held.length - 1 : i, 1);
-    if (pid === r.carriagePiece) r.carriagePiece = null;
+    const inClaw = pid === r.carriagePiece;
+    if (inClaw) r.carriagePiece = null;
     const p = this.pieces.find((q) => q.id === pid);
-    Object.assign(p, this.heldWorldPos(r, r.held.length));
+    Object.assign(p, this.heldWorldPos(r, r.held.length, inClaw));
     p.holder = null;
     return p;
   }
 
-  // a 526 hopper fills underneath the elevator's piece, which stays last in `held`
+  // a hopper fills underneath the gripper's piece, which stays last in `held`
   addHeld(r, id) {
-    if (r.cfg.mods.mech === 'elevIntake' && r.carriagePiece) r.held.splice(r.held.length - 1, 0, id);
+    if (hasGripper(r.cfg.mods) && r.carriagePiece) r.held.splice(r.held.length - 1, 0, id);
     else r.held.push(id);
   }
 
@@ -785,14 +865,18 @@ export class Match {
   }
 
   eject(r) {
+    // a rear trader spits its carrots out the back once the claw is empty
+    const rear = hasRearTrader(r.cfg.mods) && !r.carriagePiece;
     const p = this.popHeld(r);
-    const [fx, fy] = this.frontPoint(r, PR + 0.06);
+    if (p.id === r.carriagePiece) r.carriagePiece = null;
+    const [fx, fy] = rear ? this.rearPoint(r, PR + 0.06) : this.frontPoint(r, PR + 0.06);
+    const dir = rear ? -1 : 1;
     p.x = fx;
     p.y = fy;
     p.z = Math.max(0, r.elev - 0.05);
     p.th = r.th + Math.PI / 2;
-    p.vx = r.vx + Math.cos(r.th) * 0.9;
-    p.vy = r.vy + Math.sin(r.th) * 0.9;
+    p.vx = r.vx + Math.cos(r.th) * 0.9 * dir;
+    p.vy = r.vy + Math.sin(r.th) * 0.9 * dir;
     p.vz = 0;
     p.w = 0;
     p.st = 'floor';
@@ -844,14 +928,14 @@ export class Match {
       for (const p of floor) {
         if (p.st !== 'floor') continue;
         if (Math.abs(p.x - r.x) > reach || Math.abs(p.y - r.y) > reach) continue;
-        if (r.intake && p.z < 0.35 && this.inIntake(r, p)) {
+        if (r.grab && p.z < 0.35 && this.inIntake(r, p)) {
           this.collect(r, p);
           continue;
         }
         if (p.z > 0.3) continue;
         this.pushPieceByBox(p, rb, r);
       }
-      if (r.intake) this.intakeFromTable(r);
+      if (r.grab) this.intakeFromTable(r);
     }
 
     // pieces vs pieces
@@ -920,11 +1004,15 @@ export class Match {
       }
     } else if (p.st === 'ramp') {
       const r = an.robot && this.robotById(an.robot);
-      if (r && r.held.length < F.MAX_HELD && this.inRampCatch(r)) {
+      const claw = r && hasRearTrader(r.cfg.mods); // ramp cakes go into the claw, not the trader
+      if (r && r.held.length < F.MAX_HELD && this.inRampCatch(r) && !(claw && r.carriagePiece)) {
         p.st = 'held';
         p.holder = r.id;
         p.anim = null;
-        this.addHeld(r, p.id);
+        if (claw) {
+          r.held.push(p.id);
+          r.carriagePiece = p.id;
+        } else this.addHeld(r, p.id);
         this.emit({ type: 'feed', robot: r.id, piece: 'cake' });
         return;
       }
@@ -975,7 +1063,7 @@ export class Match {
     p.holder = r.id;
     p.vx = p.vy = p.vz = p.w = 0;
     r.held.push(p.id);
-    if (r.cfg.mods.mech === 'elevIntake') r.carriagePiece = p.id; // ground pickups go onto the elevator
+    if (hasGripper(r.cfg.mods)) r.carriagePiece = p.id; // ground pickups go into the gripper
     if (r.held.length >= F.MAX_HELD) r.intake = false;
     this.emit({ type: 'intake', robot: r.id, piece: p.type });
   }
@@ -1081,12 +1169,19 @@ export class Match {
     if (!r.cfg.mods.ramp) return this.denied(r, "This robot can't catch cakes from the RAMP");
     if (!this.humansLive()) return this.denied(r, 'The RAMP human player waits for TELEOP');
     if (this.inv[r.alliance].rampCakes <= 0) return this.denied(r, 'No cakes stored on the RAMP');
-    const room = F.MAX_HELD - r.held.length - this.incoming(r);
-    if (room <= 0) return this.denied(r, 'Robot is full');
+    const room = this.rampRoom(r);
+    if (room <= 0) return this.denied(r, hasRearTrader(r.cfg.mods) && r.held.length < F.MAX_HELD ? 'Claw already holds a piece — score it first' : 'Robot is full');
     r.rampReq = Math.min(n, room);
     r.rampManual = true;
     this.emit({ type: 'hint', robot: r.id, msg: `Rolling ${r.rampReq} cake${r.rampReq > 1 ? 's' : ''} down the RAMP` });
     return true;
+  }
+
+  // how many ramp cakes a robot can still take (a claw takes one at a time)
+  rampRoom(r) {
+    const room = F.MAX_HELD - r.held.length - this.incoming(r);
+    if (!hasRearTrader(r.cfg.mods)) return room;
+    return r.carriagePiece || this.incoming(r, 'ramp') ? 0 : Math.min(1, room);
   }
 
   humansLive() {
@@ -1185,7 +1280,7 @@ export class Match {
           q.rampManual = false;
         }
       }
-      const room = (q) => q.held.length + this.incoming(q) < F.MAX_HELD;
+      const room = (q) => this.rampRoom(q) > 0;
       const catcher =
         this.robots.find((q) => q.alliance === a && q.rampReq > 0 && this.inRampCatch(q) && room(q)) ||
         this.robots.find((q) => q.alliance === a && q.rampWait >= RAMP_WAIT && (this.autoRamp || (!q.rampAligned && !q.rampManual)) && room(q));
@@ -1202,9 +1297,10 @@ export class Match {
     }
   }
 
-  incoming(r) {
+  // pieces already on their way down a chute / the ramp to this robot (optionally only one kind)
+  incoming(r, kind) {
     let n = 0;
-    for (const p of this.pieces) if ((p.st === 'chute' || p.st === 'ramp') && p.anim && p.anim.robot === r.id) n++;
+    for (const p of this.pieces) if ((kind ? p.st === kind : p.st === 'chute' || p.st === 'ramp') && p.anim && p.anim.robot === r.id) n++;
     return n;
   }
 
@@ -1343,7 +1439,14 @@ export class Match {
         r3(r.th),
         r3(r.elev),
         held(r),
-        (r.intake ? 1 : 0) | (r.taxi ? 2 : 0) | (r.parked ? 4 : 0) | (r.carriage ? 8 : 0) | (r.tongue ? 16 : 0) | (r.stunUntil > this.time ? 32 : 0) | (r.rampAligned ? 64 : 0),
+        (r.intake ? 1 : 0) |
+          (r.taxi ? 2 : 0) |
+          (r.parked ? 4 : 0) |
+          (r.carriage ? 8 : 0) |
+          (r.tongue ? 16 : 0) |
+          (r.stunUntil > this.time ? 32 : 0) |
+          (r.rampAligned ? 64 : 0) |
+          (r.ovenRear ? 128 : 0),
         r3(r.vx),
         r3(r.vy),
         r3(r.w),
@@ -1351,6 +1454,7 @@ export class Match {
         r.elevTarget,
         r2(r.rampWait || 0),
         r.rampReq || 0,
+        Math.round(r.arm || 0),
       ]),
       p: this.pieces.filter((p) => p.st !== 'held' && p.st !== 'gone').map((p) => [p.id, p.type === 'cake' ? 'k' : 'c', p.st[0], r3(p.x), r3(p.y), r3(p.z), r3(p.th), r2(p.roll)]),
       s: { red: this.score.red, blue: this.score.blue },

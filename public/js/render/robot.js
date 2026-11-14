@@ -3,7 +3,9 @@
 
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import * as F from '/shared/field.js';
+import { elevTravel, clawPose } from '/shared/robots.js';
 import { mat, aluMat, textCanvas, labelSprite, allianceColor, COLORS } from './util.js';
 import { makePieceMesh } from './pieces.js';
 
@@ -11,7 +13,14 @@ const BUMPER_T = 0.085;
 const BUMPER_Z0 = 0.025;
 const BUMPER_H = 0.13;
 const loader = new GLTFLoader();
+loader.setMeshoptDecoder(MeshoptDecoder); // the robot CAD is meshopt-compressed
 const modelCache = new Map();
+// where trader carrots ride in Charles's rear hopper: [forward, up] in the robot frame
+const TRADER_SLOTS = [
+  [-0.24, 0.36],
+  [-0.09, 0.385],
+  [-0.165, 0.5],
+];
 
 function loadModel(url) {
   if (!modelCache.has(url)) modelCache.set(url, loader.loadAsync(url));
@@ -259,21 +268,79 @@ export class RobotView {
       });
       this.cadElevator = model.elevatorNode ? cad.getObjectByName(model.elevatorNode) : null;
       this.cadElevatorBase = this.cadElevator?.position.y ?? 0;
-      this.group.remove(this.body);
-      this.body = cad;
-      this.group.add(cad);
-      if (model.hideBumpers) this.bumpers.visible = false;
       this.stage2 = null;
       this.carriage = null;
       this.roller = null;
       this.modules = [];
       this.wheels = [];
+      if (model.rig === 'charles') this.rigCharles(cad); // (before it joins the scene: works in the robot's own frame)
+      this.group.remove(this.body);
+      this.body = cad;
+      this.group.add(cad);
+      if (model.hideBumpers) this.bumpers.visible = false;
     } catch (err) {
       console.warn('Robot CAD failed to load, keeping placeholder:', model.url, err);
     }
   }
 
-  // state: {x,y,th,elev,held,flags,vx,vy,w}
+  // CHARLES: the CAD's meshes are tagged (by material name) with the part of the robot they belong
+  // to. Regroup them so the elevator stage, carriage, claw arm and swerve wheels can move.
+  rigCharles(cad) {
+    cad.updateMatrixWorld(true);
+    const parts = {};
+    const meshes = [];
+    cad.traverse((o) => o.isMesh && meshes.push(o));
+    const rig = new THREE.Group();
+    cad.add(rig);
+    const part = (name, parent = rig) => {
+      const g = new THREE.Group();
+      parent.add(g);
+      parts[name] = g;
+      return g;
+    };
+    part('base');
+    part('stage');
+    part('carriage');
+    const A = this.cfg.arm;
+    const pivot = part('arm', parts.carriage);
+    pivot.position.set(A.pivot[0], A.pivot[1], 0);
+    const wheelBoxes = {};
+    for (const m of meshes) {
+      const tag = (m.material?.name || 'base').split('_')[0];
+      if (tag === 'bumper') {
+        m.visible = false; // the sim draws alliance-coloured bumpers with the team number
+        continue;
+      }
+      if (tag === 'glass') {
+        // clear polycarbonate trader walls
+        m.material = new THREE.MeshStandardMaterial({ color: 0xcfe4ff, transparent: true, opacity: 0.22, roughness: 0.15, metalness: 0, depthWrite: false, side: THREE.DoubleSide });
+        m.castShadow = false;
+        m.renderOrder = 2;
+      }
+      if (tag.startsWith('wheel')) {
+        (wheelBoxes[tag] ??= new THREE.Box3()).expandByObject(m);
+        if (!parts[tag]) part(tag);
+      }
+      (parts[tag] || parts.base).attach(m);
+    }
+    // swerve wheels + turrets steer about their own centre
+    for (const [tag, box] of Object.entries(wheelBoxes)) {
+      const c = box.getCenter(new THREE.Vector3());
+      const g = parts[tag];
+      const kids = [...g.children];
+      g.position.set(c.x, 0, c.z);
+      g.updateMatrixWorld(true);
+      for (const k of kids) {
+        k.position.x -= c.x;
+        k.position.z -= c.z;
+      }
+      this.modules.push({ g, x: c.x, z: c.z });
+    }
+    this.rig = parts;
+    this.tongue.material.visible = false; // on Charles the arm itself is the tongue
+  }
+
+  // state: {x,y,th,elev,held,flags,vx,vy,w,arm}
   update(st, dt) {
     const g = this.group;
     g.position.set(st.x, 0, -st.y);
@@ -297,7 +364,7 @@ export class RobotView {
       const mvy = lvy + w * m.x;
       const sp = Math.hypot(mvx, mvy);
       if (sp > 0.05) m.g.rotation.y = Math.atan2(mvy, mvx);
-      this.wheels[i].rotation.z -= (sp / 0.05) * dt;
+      if (this.wheels[i]) this.wheels[i].rotation.z -= (sp / 0.05) * dt;
     }
     // tongue slides out of the end effector (elevator side) and wiggles
     const tOn = !!(st.flags & 16);
@@ -321,8 +388,28 @@ export class RobotView {
       if (on) this.roller.rotation.z += dt * 22;
     }
 
-    // passthrough: every held piece rides the carriage. separate: one on the carriage, rest in the hopper
     const held = st.held || '';
+    if (this.rig) {
+      // 2-stage cascade elevator: the carriage travels twice as far as the first stage
+      const travel = elevTravel(this.cfg, st.elev);
+      this.rig.stage.position.y = travel / 2;
+      this.rig.carriage.position.y = travel;
+      this.rig.arm.rotation.z = ((st.arm ?? this.cfg.arm.stow) * Math.PI) / 180;
+      // one piece locked in the claw (the last in `held`), the rest ride in the rear trader
+      const inClaw = st.flags & 8 ? 1 : 0;
+      const cp = clawPose(this.cfg, st.elev, st.arm ?? this.cfg.arm.stow);
+      for (let i = 0; i < this.heldMeshes.length; i++) {
+        const pair = this.heldMeshes[i];
+        const t = held[held.length - 1 - i];
+        pair.c.visible = t === 'c';
+        pair.k.visible = t === 'k';
+        const m = t === 'k' ? pair.k : pair.c;
+        if (i < inClaw) m.position.set(cp.x, cp.z, 0);
+        else m.position.set(TRADER_SLOTS[i - inClaw][0], TRADER_SLOTS[i - inClaw][1], 0);
+      }
+      return;
+    }
+    // passthrough: every held piece rides the carriage. separate: one on the carriage, rest in the hopper
     const onCarriage = this.separate ? (st.flags & 8 ? 1 : 0) : held.length;
     for (let i = 0; i < this.heldMeshes.length; i++) {
       const pair = this.heldMeshes[i];

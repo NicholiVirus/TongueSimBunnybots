@@ -15,7 +15,7 @@ test('bots grab their table cake during AUTO', () => {
 });
 
 test('cakes stay stored on the ramp until a robot waits at the bottom', () => {
-  const m = new Match({ slots: [{ id: 'a', alliance: 'red', station: 1, robot: 'team' }], preload: 0 });
+  const m = new Match({ slots: [{ id: 'a', alliance: 'red', station: 1, robot: 'kitbot' }], preload: 0 });
   const r = m.robots[0];
   while (m.phase === 'countdown') m.step();
   m.inv.red.rampCakes = 2;
@@ -33,7 +33,7 @@ test('cakes stay stored on the ramp until a robot waits at the bottom', () => {
 });
 
 test('aligned at the ramp, 1/2/3 roll down exactly that many cakes and leave the elevator alone', () => {
-  const m = new Match({ slots: [{ id: 'a', alliance: 'red', station: 1, robot: 'team', mods: { mech: 'separate' } }], preload: 0 });
+  const m = new Match({ slots: [{ id: 'a', alliance: 'red', station: 1, robot: 'kitbot', mods: { mech: 'separate' } }], preload: 0 });
   const r = m.robots[0];
   while (m.phase === 'countdown') m.step();
   m.inv.red.rampCakes = 3;
@@ -59,7 +59,7 @@ test('aligned at the ramp, 1/2/3 roll down exactly that many cakes and leave the
 });
 
 test('auto-roll setting sends cakes down without a catcher', () => {
-  const m = new Match({ slots: [{ id: 'a', alliance: 'red', station: 1, robot: 'team' }], preload: 0, autoRamp: true });
+  const m = new Match({ slots: [{ id: 'a', alliance: 'red', station: 1, robot: 'kitbot' }], preload: 0, autoRamp: true });
   while (m.phase === 'countdown') m.step();
   m.inv.red.rampCakes = 2;
   for (let i = 0; i < 60 * 4; i++) m.step();
@@ -84,8 +84,8 @@ test('in AUTO one bot per alliance rushes the table cake, partners feed the oven
 
 test('robot mechanism options are enforced', () => {
   const slots = [
-    { id: 'a', alliance: 'red', station: 1, robot: 'team', mods: { ground: false, maxLevel: 1 } },
-    { id: 'b', alliance: 'red', station: 2, robot: 'team', mods: { mech: 'separate' } },
+    { id: 'a', alliance: 'red', station: 1, robot: 'kitbot', mods: { ground: false, maxLevel: 1 } },
+    { id: 'b', alliance: 'red', station: 2, robot: 'kitbot', mods: { mech: 'separate' } },
   ];
   const m = new Match({ slots });
   const [a, b] = m.robots;
@@ -119,7 +119,7 @@ test('robot mechanism options are enforced', () => {
 
 test('elevator-back robots score with their back to the pantry; depot auto-align', async () => {
   const { alignTarget } = await import('../shared/sim.js');
-  const m = new Match({ slots: [{ id: 'a', alliance: 'red', station: 1, robot: 'team', mods: { mech: 'opposite' } }] });
+  const m = new Match({ slots: [{ id: 'a', alliance: 'red', station: 1, robot: 'kitbot', mods: { mech: 'opposite' } }] });
   const r = m.robots[0];
   while (m.phase === 'countdown') m.step();
   r.x = F.pantrySlotX(2, 1);
@@ -144,8 +144,8 @@ test('elevator-back robots score with their back to the pantry; depot auto-align
 test('team 611 tongue slides scored pieces along the shelf; others cannot deploy it', () => {
   const m = new Match({
     slots: [
-      { id: 'a', alliance: 'red', station: 1, robot: 'team', team: '611' },
-      { id: 'b', alliance: 'blue', station: 1, robot: 'team', team: '449' },
+      { id: 'a', alliance: 'red', station: 1, robot: 'kitbot', team: '611' },
+      { id: 'b', alliance: 'blue', station: 1, robot: 'kitbot', team: '449' },
     ],
   });
   const [a, b] = m.robots;
@@ -174,8 +174,8 @@ test('team 611 tongue slides scored pieces along the shelf; others cannot deploy
 test('team 612 freezes robots it hits for 5 s', () => {
   const m = new Match({
     slots: [
-      { id: 'a', alliance: 'red', station: 1, robot: 'team', team: '612' },
-      { id: 'b', alliance: 'blue', station: 1, robot: 'team', team: '449' },
+      { id: 'a', alliance: 'red', station: 1, robot: 'kitbot', team: '612' },
+      { id: 'b', alliance: 'blue', station: 1, robot: 'kitbot', team: '449' },
     ],
   });
   const [a, b] = m.robots;
@@ -197,7 +197,7 @@ test('team 612 freezes robots it hits for 5 s', () => {
 });
 
 test('team 526 is locked to an L1 ground-intake elevator plus a depot/ramp-only hopper', () => {
-  const m = new Match({ slots: [{ id: 'a', alliance: 'red', station: 1, robot: 'team', team: '526', mods: { maxLevel: 3, mech: 'passthrough' } }], preload: 0 });
+  const m = new Match({ slots: [{ id: 'a', alliance: 'red', station: 1, robot: 'kitbot', team: '526', mods: { maxLevel: 3, mech: 'passthrough' } }], preload: 0 });
   const r = m.robots[0];
   assert.equal(r.cfg.mods.maxLevel, 1);
   assert.equal(r.cfg.mods.mech, 'elevIntake');
@@ -219,7 +219,7 @@ test('team 526 is locked to an L1 ground-intake elevator plus a depot/ramp-only 
 
 test('official rules: oven carrots go to the opposing depot and human players sit out AUTO', () => {
   const run = (officialRules) => {
-    const m = new Match({ slots: [{ id: 'a', alliance: 'red', station: 1, robot: 'team' }], preload: 0, officialRules });
+    const m = new Match({ slots: [{ id: 'a', alliance: 'red', station: 1, robot: 'kitbot' }], preload: 0, officialRules });
     const r = m.robots[0];
     while (m.phase === 'countdown') m.step();
     const red0 = m.inv.red.depotCarrots;
@@ -245,7 +245,7 @@ test('official rules: oven carrots go to the opposing depot and human players si
 });
 
 test('waiting at the foot of the ramp cannot score into the oven', () => {
-  const m = new Match({ slots: [{ id: 'a', alliance: 'red', station: 1, robot: 'team' }] });
+  const m = new Match({ slots: [{ id: 'a', alliance: 'red', station: 1, robot: 'kitbot' }] });
   const r = m.robots[0];
   while (m.phase === 'countdown') m.step();
   r.x = F.OVEN.x0 - r.cfg.length / 2 - 0.02;
@@ -260,8 +260,8 @@ test('setup: drive anywhere inside your KITCHEN, the clock waits, ENTER/F starts
   const { inStartZone } = await import('../shared/sim.js');
   const m = new Match({
     slots: [
-      { id: 'a', alliance: 'red', station: 2, robot: 'team' },
-      { id: 'b', alliance: 'red', station: 1, robot: 'team', bot: true },
+      { id: 'a', alliance: 'red', station: 2, robot: 'kitbot' },
+      { id: 'b', alliance: 'red', station: 1, robot: 'kitbot', bot: true },
     ],
     setup: true,
   });
@@ -280,7 +280,7 @@ test('setup: drive anywhere inside your KITCHEN, the clock waits, ENTER/F starts
 
 function fullBotMatch() {
   const slots = [];
-  for (const alliance of ['red', 'blue']) for (const station of [1, 2, 3]) slots.push({ id: `${alliance}${station}`, alliance, station, robot: ['team', 'speedy', 'tank'][station - 1], bot: true });
+  for (const alliance of ['red', 'blue']) for (const station of [1, 2, 3]) slots.push({ id: `${alliance}${station}`, alliance, station, robot: ['kitbot', 'speedy', 'tank'][station - 1], bot: true });
   const m = new Match({ slots });
   m.bots = slots.map((s) => new Bot(s.id));
   return m;
@@ -316,7 +316,7 @@ test('a full 6-bot match runs to completion with sane scores', () => {
 });
 
 test('pantry scoring needs the right elevator height and facing', () => {
-  const m = new Match({ slots: [{ id: 'a', alliance: 'red', station: 1, robot: 'team' }] });
+  const m = new Match({ slots: [{ id: 'a', alliance: 'red', station: 1, robot: 'kitbot' }] });
   const r = m.robots[0];
   while (m.phase === 'countdown') m.step();
   r.x = F.pantrySlotX(2, 1);
@@ -346,7 +346,7 @@ test('shelf has no grid: pieces land where the robot is, and overlaps are refuse
 });
 
 test('oven carrots recirculate into a cake on the ramp', () => {
-  const m = new Match({ slots: [{ id: 'a', alliance: 'red', station: 1, robot: 'team' }], preload: 0 });
+  const m = new Match({ slots: [{ id: 'a', alliance: 'red', station: 1, robot: 'kitbot' }], preload: 0 });
   const r = m.robots[0];
   while (m.phase === 'countdown') m.step();
   const startDepotRed = m.inv.red.depotCarrots;

@@ -169,11 +169,14 @@ export class Hud {
       `<span>CAM: ${ctx.camName}</span>`,
       `<span class="${me.flags & 2 ? 'on' : ''}">TAXI ${me.flags & 2 ? '✓' : '·'}</span>`,
       `<span class="${me.flags & 1 ? 'on' : ''}">INTAKE</span>`,
+      cfg.mods?.mech === 'claw'
+        ? `<span class="${me.flags & 8 ? 'on' : ''}">CLAW ${me.flags & 8 ? (held[held.length - 1] === 'k' ? '🍰' : '🥕') : 'empty'}</span><span class="${held.length - (me.flags & 8 ? 1 : 0) ? 'on' : ''}">TRADER ${held.length - (me.flags & 8 ? 1 : 0)}🥕</span>`
+        : '',
       (cfg.mods?.mech === 'separate' || cfg.mods?.mech === 'opposite') && held.length
         ? `<span class="${me.flags & 8 ? 'on' : ''}">CARRIAGE ${me.flags & 8 ? 'LOADED' : 'reloading — stow'}</span>`
         : '',
       me.flags & 64
-        ? `<span class="on">RAMP ${me.rampReq ? `${me.rampReq} cake${me.rampReq > 1 ? 's' : ''} coming` : 'press 1/2/3 for cakes'}</span>`
+        ? `<span class="on">RAMP ${me.rampReq ? `${me.rampReq} cake${me.rampReq > 1 ? 's' : ''} coming` : cfg.mods?.mech === 'claw' ? 'press 1 for a cake' : 'press 1/2/3 for cakes'}</span>`
         : me.rampWait > 0
           ? `<span class="on">RAMP ${me.rampWait >= 1 ? 'CATCHING' : `hold still ${(1 - me.rampWait).toFixed(1)}s`}</span>`
           : '',

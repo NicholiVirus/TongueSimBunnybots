@@ -1,9 +1,10 @@
-// Robot presets. Every robot uses the same mechanism model:
-//   swerve drivetrain + front roller intake + elevator carriage that holds up to 3 pieces.
+// Robot presets: a swerve drivetrain plus a scoring mechanism (see MECHS below).
 //
-// To drop in your team's CAD later, export it as a .glb and set `model` on a preset
-// (see public/assets/robots/README.md). Physics only uses the numbers below, so the
-// CAD is purely visual — tune `length`/`width`/`elevator` to match the real robot.
+// `team` is CHARLES, team 611's real Harvest Havoc robot: its CAD is the 3D model and its build
+// (roller claw on a 2-stage elevator + rear trader) is fixed. The other presets are procedural
+// placeholders whose mechanisms can be configured in the menu.
+// To use another team's CAD, export a .glb and set `model` on a preset (see
+// public/assets/robots/README.md). Physics only uses the numbers below.
 
 import { IN } from './field.js';
 
@@ -35,9 +36,35 @@ export const ROBOTS = {
   team: {
     ...base,
     id: 'team',
-    name: 'Our Robot (placeholder)',
-    blurb: 'Placeholder for our CAD — balanced elevator robot.',
-    // model: { url: '/assets/robots/team/robot.glb', scale: 1, yaw: 0, z: 0, elevatorNode: 'Carriage' },
+    name: 'Charles (611)',
+    blurb:
+      'Team 611\u2019s robot. Roller claw on a 2-stage elevator holds ONE piece (ground or ramp) and places it on the shelves; the rear trader takes 3 depot carrots and fires them into the oven.',
+    // numbers from the CAD and the robot code (Saxon-Robotics/Bunnybots-2026)
+    length: 0.914, // bumper-to-bumper, claw (front) to trader (back)
+    width: 0.946,
+    mass: 62, // 54 kg robot + bumpers
+    maxSpeed: 5.12,
+    accel: 10,
+    intakeWidth: 0.5, // the claw is narrow: line it up with the middle of the piece
+    intakeReach: 0.3, // the arm folds out past the front bumper
+    scoreCooldown: 0.3,
+    // the build is the real robot's: it can't be changed in the menu
+    build: { ground: true, depot: true, ramp: true, maxLevel: 3, mech: 'claw' },
+    // arm angles in degrees (0 = straight out the front, 90 = up), speed in deg/s.
+    // pivot = [forward, up] of the arm pivot on the carriage (m, robot frame, elevator down);
+    // grip = where the held piece sits in the arm's own frame [along the arm, above it]
+    arm: { stow: 99, ground: -5, ramp: 90, oven: 70, pantry: 60, tongue: 45, speed: 320, tolerance: 8, pivot: [0.2985, 0.197], grip: [0.3, -0.12] },
+    // real carriage travel (m) at each sim setpoint: 21" / 33" / 48"
+    elevator: { ...base.elevator, travel: { stow: 0, oven: 0, l1: 0.533, l2: 0.838, l3: 1.219 } },
+    trader: { x: -0.2, z: 0.33 }, // where trader carrots ride (robot frame)
+    traderRate: 0.16, // s between carrots fired out of the trader
+    model: { url: '/assets/robots/team/charles.glb', rig: 'charles' },
+  },
+  kitbot: {
+    ...base,
+    id: 'kitbot',
+    name: 'Custom robot (placeholder)',
+    blurb: 'Generic 32" elevator robot — pick its mechanisms below.',
   },
   speedy: {
     ...base,
@@ -80,12 +107,23 @@ export const ROBOT_IDS = Object.keys(ROBOTS);
 //                             reloads at the bottom (~0.45 s), but the robot stays stable when raised
 //              'opposite'   : hopper + ground intake on the FRONT, elevator on the BACK — like 'separate',
 //                             but the robot scores on the shelves with its back to the pantry
+//              'claw'       : CHARLES — a roller claw on an arm + elevator holds ONE piece (from the
+//                             floor or the ramp) and scores it out the FRONT (shelves or oven); a
+//                             TRADER hopper on the BACK takes up to 3 carrots from the DEPOT and fires
+//                             them into the OVEN out the back
 export const DEFAULT_MODS = { ground: true, depot: true, ramp: true, maxLevel: 3, mech: 'passthrough' };
 export const MECHS = { passthrough: 'Passthrough elevator', separate: 'Hopper + separate elevator', opposite: 'Hopper front + elevator back' };
-// mechanisms that only come from a team lock (not selectable in menus)
-const LOCKED_MECHS = { elevIntake: 'Ground-intake elevator + depot/ramp hopper' };
+// mechanisms that only come from a locked build (a robot preset or a team number), not from menus
+const LOCKED_MECHS = { elevIntake: 'Ground-intake elevator + depot/ramp hopper', claw: 'Roller claw + rear trader (Charles)' };
+export const MECH_NAMES = { ...MECHS, ...LOCKED_MECHS };
 // one piece per lift
-export const isOneAtATime = (mods) => mods?.mech === 'separate' || mods?.mech === 'opposite' || mods?.mech === 'elevIntake';
+export const isOneAtATime = (mods) => mods?.mech === 'separate' || mods?.mech === 'opposite' || mods?.mech === 'elevIntake' || mods?.mech === 'claw';
+// the elevator's end effector holds one piece itself (`carriagePiece`); the rest sit in a hopper
+export const hasGripper = (mods) => mods?.mech === 'elevIntake' || mods?.mech === 'claw';
+// the hopper is a trader on the BACK of the robot: depot carrots only, fired into the oven rear-first
+export const hasRearTrader = (mods) => mods?.mech === 'claw';
+// the build a robot actually plays with: a preset's fixed build wins, then a team lock, then the menu
+export const buildFor = (robot, team, mods) => sanitizeMods(ROBOTS[robot]?.build || TEAM_LOCKS[String(team ?? '')] || mods);
 // the elevator reloads from the hopper at the bottom
 export const reloadsFromHopper = (mods) => mods?.mech === 'separate' || mods?.mech === 'opposite';
 
@@ -125,13 +163,13 @@ export function sanitizeMods(m) {
 export function modsLabel(m) {
   const md = sanitizeMods(m);
   const intakes = [md.ground && 'Ground', md.depot && 'Depot', md.ramp && 'Ramp'].filter(Boolean).join('/') || 'No intake';
-  return `${intakes} · ${md.maxLevel ? 'L' + md.maxLevel : 'Oven'} · ${{ passthrough: 'Passthrough', separate: 'Hopper+Elev', opposite: 'Hopper|Elev opposite', elevIntake: 'Intake-elevator + hopper (526)' }[md.mech]}`;
+  return `${intakes} · ${md.maxLevel ? 'L' + md.maxLevel : 'Oven'} · ${{ passthrough: 'Passthrough', separate: 'Hopper+Elev', opposite: 'Hopper|Elev opposite', elevIntake: 'Intake-elevator + hopper (526)', claw: 'Claw + trader' }[md.mech]}`;
 }
 
 const cfgCache = new Map();
 export function getRobotConfig(id, mods) {
   const base = ROBOTS[id] || ROBOTS.team;
-  const md = sanitizeMods(mods);
+  const md = sanitizeMods(base.build || mods);
   const key = `${base.id}:${JSON.stringify(md)}`;
   if (cfgCache.has(key)) return cfgCache.get(key);
   const top = ['oven', 'l1', 'l2', 'l3'][md.maxLevel];
@@ -142,3 +180,28 @@ export function getRobotConfig(id, mods) {
 }
 
 export const SETPOINT_ORDER = ['stow', 'oven', 'l1', 'l2', 'l3'];
+
+// Real carriage travel (m) for a sim elevator height, for robots that define `elevator.travel`.
+export function elevTravel(cfg, elev) {
+  const e = cfg.elevator;
+  if (!e.travel) return elev - e.min;
+  let k0 = SETPOINT_ORDER[0];
+  for (const k of SETPOINT_ORDER) {
+    if (elev <= e.setpoints[k]) {
+      const span = e.setpoints[k] - e.setpoints[k0];
+      const t = span > 1e-6 ? (elev - e.setpoints[k0]) / span : 1;
+      return e.travel[k0] + (e.travel[k] - e.travel[k0]) * Math.max(0, Math.min(1, t));
+    }
+    k0 = k;
+  }
+  return e.travel[k0];
+}
+
+// Where a claw robot's held piece is, in the robot frame: { x: forward, z: up } (m).
+export function clawPose(cfg, elev, armDeg) {
+  const A = cfg.arm;
+  const a = (armDeg * Math.PI) / 180;
+  const c = Math.cos(a);
+  const s = Math.sin(a);
+  return { x: A.pivot[0] + A.grip[0] * c - A.grip[1] * s, z: A.pivot[1] + elevTravel(cfg, elev) + A.grip[0] * s + A.grip[1] * c };
+}

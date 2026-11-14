@@ -1,6 +1,6 @@
 import { Match, TICK } from '../shared/sim.js';
 import { Bot } from '../shared/bot.js';
-import { ROBOTS, sanitizeMods, effectiveMods } from '../shared/robots.js';
+import { ROBOTS, sanitizeMods, buildFor } from '../shared/robots.js';
 
 export const SLOT_IDS = ['red1', 'red2', 'red3', 'blue1', 'blue2', 'blue3'];
 const SNAP_EVERY = 2; // 60 Hz sim -> 30 Hz snapshots
@@ -124,7 +124,7 @@ export class Room {
         break;
       case 'fillBots':
         if (!isHost || this.phase !== 'lobby') return;
-        for (const s of SLOT_IDS) if (!this.slots[s]) this.slots[s] = { type: 'bot', robot: ['team', 'speedy', 'tank'][SLOT_IDS.indexOf(s) % 3] };
+        for (const s of SLOT_IDS) if (!this.slots[s]) this.slots[s] = { type: 'bot', robot: ['team', 'kitbot', 'speedy', 'tank'][SLOT_IDS.indexOf(s) % 4] };
         this.broadcastRoom();
         break;
       case 'kick': {
@@ -354,10 +354,10 @@ export class Room {
     for (const s of SLOT_IDS) {
       const sl = this.slots[s];
       if (!sl) slots[s] = null;
-      else if (sl.type === 'bot') slots[s] = { type: 'bot', robot: sl.robot, name: sl.name || 'Bot' };
+      else if (sl.type === 'bot') slots[s] = { type: 'bot', robot: sl.robot, mods: buildFor(sl.robot, sl.team, sl.mods), name: sl.name || 'Bot' };
       else {
         const p = this.players.get(sl.pid);
-        slots[s] = p ? { type: 'human', pid: p.id, name: p.name, team: p.team, robot: p.robot, mods: effectiveMods(p.team, p.mods) } : null;
+        slots[s] = p ? { type: 'human', pid: p.id, name: p.name, team: p.team, robot: p.robot, mods: buildFor(p.robot, p.team, p.mods) } : null;
       }
     }
     const seated = new Set(SLOT_IDS.map((s) => this.slots[s]?.pid).filter(Boolean));

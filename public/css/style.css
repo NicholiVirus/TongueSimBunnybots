@@ -842,6 +842,12 @@ ol.small li {
   line-height: 1.45;
 }
 
+/* a robot with a fixed build (Charles): its mechanism list is read-only */
+details.fixed .config-grid {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
 /* ------------------------------------------------------------------ leaderboard */
 .btn.ranked {
   border-color: rgba(255, 216, 74, 0.5);

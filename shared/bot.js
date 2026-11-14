@@ -3,7 +3,7 @@
 
 import * as F from './field.js';
 import { shelfFit } from './sim.js';
-import { isOneAtATime, shelfSide } from './robots.js';
+import { isOneAtATime, shelfSide, hasGripper, hasRearTrader } from './robots.js';
 
 const CELL = 0.2;
 const NX = Math.ceil((F.FIELD.halfL * 2) / CELL);
@@ -308,9 +308,10 @@ export class Bot {
         inp.my = 0;
         inp.rot = Math.abs(he) > 0.08 ? inp.rot : 0;
       }
-      if (r.held.length >= F.MAX_HELD || (m.inv[r.alliance].rampCakes <= 0 && !m.incoming(r))) t.done = true;
+      if (m.rampRoom(r) + m.incoming(r, 'ramp') <= 0 || (m.inv[r.alliance].rampCakes <= 0 && !m.incoming(r))) t.done = true;
       // carrots aboard (all 3 slots should be free for cakes): leave and unload them in the oven first
-      if (r.held.some((id) => m.pieces.find((p) => p.id === id)?.type === 'carrot')) {
+      // (a claw robot's trader carrots don't get in the way of the claw)
+      if (!hasRearTrader(r.cfg.mods) && r.held.some((id) => m.pieces.find((p) => p.id === id)?.type === 'carrot')) {
         t.done = true;
       }
     }
@@ -386,8 +387,13 @@ export class Bot {
     if (m.phase === 'teleop' && m.timeLeft < parkDist / (r.cfg.maxSpeed * 0.5) + 7) return parkSpot;
 
     const heldTypes = r.held.map((id) => m.pieces.find((p) => p.id === id)?.type);
+    // gripper robots (claw / 526) pick ONE piece off the floor; the rest of their room is a depot hopper
+    const gripper = hasGripper(r.cfg.mods);
+    const trader = hasRearTrader(r.cfg.mods);
+    const floorFull = r.held.length >= F.MAX_HELD || (gripper && !!r.carriagePiece);
+    const rampBlocked = trader ? !!r.carriagePiece : heldTypes.includes('carrot');
     // keep catching while stored cakes are still coming down
-    if (this.task?.kind === 'ramp' && !this.task.done && r.held.length < F.MAX_HELD && !heldTypes.includes('carrot') && (m.inv[a].rampCakes > 0 || m.incoming(r))) return this.task;
+    if (this.task?.kind === 'ramp' && !this.task.done && r.held.length < F.MAX_HELD && !rampBlocked && (m.inv[a].rampCakes > 0 || m.incoming(r))) return this.task;
     // PRIORITY 1: cakes aboard go on the shelves
     if (heldTypes.includes('cake')) {
       const t = this.scoreTask(m, r);
@@ -396,21 +402,22 @@ export class Bot {
     // PRIORITY 2: cakes stored at our ramp — dump carrots in the oven (right beside it), then wait to catch
     const ramp = this.rampTask(m, r);
     if (ramp) {
-      if (heldTypes.includes('carrot')) return this.task?.kind === 'oven' && !this.task.done ? this.task : this.scoreTask(m, r);
+      if (rampBlocked) return this.task?.kind === 'oven' && !this.task.done ? this.task : this.scoreTask(m, r);
       return ramp;
     }
 
     // keep a task that is still valid (avoid dithering)
     if (this.task && !this.task.done && this.task.kind !== 'park' && m.time - this.task.since < 6) {
-      if (this.task.kind === 'collect' && r.held.length < F.MAX_HELD) return this.task;
+      if (this.task.kind === 'collect' && !floorFull) return this.task;
       if ((this.task.kind === 'pantry' || this.task.kind === 'oven') && r.held.length) return this.task;
       if (this.task.kind === 'depot' && r.held.length < F.MAX_HELD) return this.task;
       if (this.task.kind === 'ramp' && r.held.length < F.MAX_HELD) return this.task;
     }
 
     // PRIORITY 3: a reachable loose CARROT CAKE is worth a detour before scoring carrots
-    const cakeAvailable = r.held.length < F.MAX_HELD && m.pieces.some((p) => p.type === 'cake' && this.cakeWorthChasing(m, r, p));
-    const wantScore = r.held.length >= F.MAX_HELD || (r.held.length > 0 && !cakeAvailable && !this.nearbyPiece(m, r, 3.0));
+    const cakeAvailable = !floorFull && m.pieces.some((p) => p.type === 'cake' && this.cakeWorthChasing(m, r, p));
+    // (a full claw goes and scores; trader carrots tag along until the robot is next at the oven)
+    const wantScore = floorFull || (r.held.length > 0 && !cakeAvailable && !this.nearbyPiece(m, r, 3.0));
     if (wantScore) {
       const t = this.scoreTask(m, r);
       if (t) return t;
@@ -423,7 +430,7 @@ export class Bot {
       const oppK = F.kitchenPoly(F.opponent(a));
       const oppF = F.farmPoly(F.opponent(a));
       for (const p of m.pieces) {
-        if (!r.cfg.mods.ground) break; // no floor intake: depot / ramp only
+        if (!r.cfg.mods.ground || floorFull) break; // no floor intake (or claw full): depot / ramp only
         if (p.st !== 'floor' && p.st !== 'table') continue;
         if (p.st === 'table' && p.x * s < 0) continue;
         if (auto && p.x * s < 0.3) continue;
@@ -517,7 +524,9 @@ export class Bot {
     // let cakes stock up and grab a full load of 3; take them one by one only when no more are
     // coming (no trades left / pending) or time is getting short
     const moreComing = inv.cakeBank > 0 || inv.ovenCarrots > 0;
-    if (!anyAmount && inv.rampCakes < F.MAX_HELD && moreComing && m.timeLeft > 50) return null;
+    // (a claw holds one cake, so it never waits for a stack)
+    if (m.rampRoom(r) <= 0) return null;
+    if (!anyAmount && !hasRearTrader(r.cfg.mods) && inv.rampCakes < F.MAX_HELD && moreComing && m.timeLeft > 50) return null;
     if ((m.bots || []).some((b) => b !== this && b.task?.kind === 'ramp' && m.robotById(b.id)?.alliance === a)) return null;
     if (![0, 1, 2].some((l) => shelfFit(m.shelfXs(a, l), 0, a) !== null)) return null;
     const s = F.sideSign(a);
@@ -584,10 +593,11 @@ export class Bot {
       // otherwise send them through the oven so they come back down the ramp for a partner
       if (m.timeLeft < 35) return { ...this.parkSpot(r), kind: 'park', since: m.time };
     }
-    // carrots -> OVEN through the kitchen-side mouth
+    // carrots -> OVEN through the kitchen-side mouth (a loaded rear trader backs up to it)
     const gx = s * ((F.OVEN.mouthX0 + F.OVEN.mouthX1) / 2 + 0.05);
     const gy = F.OVEN.y1 + half + 0.02;
-    return { kind: 'oven', goal: [gx, gy], stage: [gx, gy + 0.6], direct: true, heading: -Math.PI / 2, sp: 'oven', heldAtStart: r.held.length, since: m.time };
+    const rear = hasRearTrader(r.cfg.mods) && r.held.length > (r.carriagePiece ? 1 : 0);
+    return { kind: 'oven', goal: [gx, gy], stage: [gx, gy + 0.6], direct: true, heading: rear ? Math.PI / 2 : -Math.PI / 2, sp: 'oven', heldAtStart: r.held.length, since: m.time };
   }
 
   parkSpot(r) {
