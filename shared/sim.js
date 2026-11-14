@@ -377,6 +377,14 @@ export class Match {
         r.held.push(pc.id);
         preloads[r.alliance]++;
       }
+      // chosen starting spot + heading (alliance view: driver-station wall on the right), if legal
+      const pose = slots.find((s) => s.id === r.id)?.pose;
+      if (pose && [pose.x, pose.y, pose.th].every(Number.isFinite)) {
+        const sg = F.sideSign(r.alliance);
+        const want = { x: pose.x * sg, y: pose.y, th: sg > 0 ? pose.th : Math.PI - pose.th };
+        const placed = this.robots.slice(0, this.robots.indexOf(r));
+        if (validStartPose(r.cfg, r.alliance, want, placed)) Object.assign(r, want);
+      }
       // Charles chooses where its two preloaded carrots start (two in the claw sit end to end, left + right)
       const load = sanitizeLoad(slots.find((s) => s.id === r.id)?.load);
       if (hasRearTrader(r.cfg.mods) && r.held.length && load !== 'trader2') {

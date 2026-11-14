@@ -130,6 +130,7 @@ wss.on('connection', (ws) => {
         if (ROBOTS[msg.robot]) player.robot = msg.robot;
         if (msg.mods) player.mods = sanitizeMods(msg.mods);
         if (msg.load) player.load = sanitizeLoad(msg.load);
+        if (msg.pose && [msg.pose.x, msg.pose.y, msg.pose.th].every(Number.isFinite)) player.pose = { x: msg.pose.x, y: msg.pose.y, th: msg.pose.th };
         break;
       case 'ping':
         player.send({ t: 'pong', ts: msg.ts });
@@ -161,7 +162,6 @@ wss.on('connection', (ws) => {
       case 'ranked': {
         player.room?.remove(player);
         const room = createRoom(false, true);
-        room.setup = msg.setup !== false; // drive to a starting spot before the countdown
         room.add(player);
         room.start();
         break;

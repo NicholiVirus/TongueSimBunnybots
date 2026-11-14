@@ -39,6 +39,26 @@
           <label class="wide" id="load-row">Starting load (Charles)
             <select id="in-load"><option value="trader2">2 carrots in the trader (back)</option><option value="split">1 in the trader + 1 in the claw</option><option value="claw2">2 end to end in the claw (left + right)</option></select>
           </label>
+          <details class="config wide" id="start-cfg">
+            <summary>Starting position &amp; heading <span id="start-summary" class="muted small"></span></summary>
+            <p class="muted small">Click or drag on your KITCHEN to place the robot, then pick its heading. Used when a match starts (practice, ranked, rooms).</p>
+            <canvas id="setup-map"></canvas>
+            <div class="setup-spots" id="setup-spots"></div>
+            <div class="setup-head">
+              <span class="muted small">Heading <b id="setup-deg-out">0°</b></span>
+              <input id="setup-deg" type="range" min="0" max="359" step="1" />
+              <div class="row">
+                <button class="btn tiny ghost" data-turn="-15">⟲ 15°</button>
+                <button class="btn tiny ghost" data-turn="15">⟳ 15°</button>
+                <button class="btn tiny ghost" data-head="pantry">Face pantry</button>
+                <button class="btn tiny ghost" data-head="oven">Face oven</button>
+                <button class="btn tiny ghost" data-head="field">Face field</button>
+                <button class="btn tiny ghost" data-head="wall">Face wall</button>
+                <button class="btn tiny ghost" data-head="reset">Default</button>
+              </div>
+            </div>
+            <p class="acct-error" id="setup-msg"></p>
+          </details>
           <details class="config wide" id="cfg">
             <summary>Mechanisms <span id="cfg-summary" class="muted small"></span></summary>
             <div class="config-grid">
@@ -104,7 +124,6 @@
             <select id="pr-skill"><option value="0.6">Rookie</option><option value="0.85" selected>Veteran</option><option value="1">Einstein</option></select>
           </label>
           <label class="check"><input type="checkbox" id="pr-autoramp" /> Auto-roll cakes down the ramp</label>
-          <label class="check"><input type="checkbox" id="pr-setup" /> Pick my starting spot before the match</label>
         </div>
         <p class="muted small">Off: cakes stay stored until a robot sits still at the bottom of its ramp for 1 s, then roll into it 0.5 s apart. On: they roll onto the field as soon as they're baked.</p>
         <label class="rule-box"><input type="checkbox" id="pr-official" />
@@ -181,41 +200,6 @@
       <div id="hint" class="hint"></div>
       <canvas id="minimap" width="330" height="166"></canvas>
       <div class="netstat hidden" id="netstat"></div>
-      <aside class="setup-panel hidden" id="setup-panel">
-        <h3>Match setup</h3>
-        <button class="btn primary" id="setup-start">Start match <small>(Enter / F)</small></button>
-        <p class="muted small">Click the map (or drive) to place your robot in your KITCHEN, then pick its heading. Your spot is remembered.</p>
-        <canvas id="setup-map"></canvas>
-        <div class="setup-spots" id="setup-spots"></div>
-        <div class="setup-head">
-          <span class="muted small">Heading <b id="setup-deg-out">0°</b></span>
-          <input id="setup-deg" type="range" min="0" max="359" step="1" />
-          <div class="row">
-            <button class="btn tiny ghost" data-turn="-15">⟲ 15°</button>
-            <button class="btn tiny ghost" data-turn="15">⟳ 15°</button>
-            <button class="btn tiny ghost" data-head="pantry">Face pantry</button>
-            <button class="btn tiny ghost" data-head="oven">Face oven</button>
-            <button class="btn tiny ghost" data-head="field">Face field</button>
-            <button class="btn tiny ghost" data-head="wall">Face wall</button>
-          </div>
-        </div>
-        <details class="config" open>
-          <summary>Configuration</summary>
-          <div class="config-grid">
-            <label class="wide" id="setup-load-row">Starting load<select id="setup-load"></select></label>
-            <label class="check"><input type="checkbox" id="setup-ground" /> Ground</label>
-            <label class="check"><input type="checkbox" id="setup-depot" /> Depot</label>
-            <label class="check"><input type="checkbox" id="setup-ramp" /> Ramp</label>
-            <label>Highest shelf
-              <select id="setup-level"><option value="0">Oven only</option><option value="1">LEVEL 1</option><option value="2">LEVEL 2</option><option value="3">LEVEL 3</option></select>
-            </label>
-            <label class="wide">Mechanism<select id="setup-mech"></select></label>
-          </div>
-          <p class="muted small" id="setup-cfg-note"></p>
-          <button class="btn tiny" id="setup-apply">Apply configuration (restarts setup)</button>
-        </details>
-        <p class="acct-error" id="setup-msg"></p>
-      </aside>
       <div class="robot-status" id="robot-status">
         <div class="rs-title" id="rs-title">—</div>
         <div class="rs-held" id="rs-held"></div>

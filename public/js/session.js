@@ -124,9 +124,10 @@ export class LocalSession {
     officialRules = false,
     setup = false,
     load,
+    pose,
     bots,
   }) {
-    this.opts = { alliance, station, robot, mods, name, team, allies, opps, skill, autoRamp, officialRules, setup, load, bots };
+    this.opts = { alliance, station, robot, mods, name, team, allies, opps, skill, autoRamp, officialRules, setup, load, pose, bots };
     this.local = true;
     this.reset();
   }
@@ -134,7 +135,7 @@ export class LocalSession {
   reset() {
     const { alliance, station, robot, mods, name, team, allies, opps, skill } = this.opts;
     const other = alliance === 'red' ? 'blue' : 'red';
-    const slots = [{ id: `${alliance}${station}`, alliance, station, robot, mods, name, team, load: this.opts.load }];
+    const slots = [{ id: `${alliance}${station}`, alliance, station, robot, mods, name, team, load: this.opts.load, pose: this.opts.pose }];
     const pool = ['kitbot', 'speedy', 'tank'];
     const allyStations = [1, 2, 3].filter((s) => s !== station).slice(0, allies);
     // per-bot robot + mechanisms from the practice menu; anything unset gets a random build (kept across restarts)

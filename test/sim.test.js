@@ -399,3 +399,14 @@ test('setup placement: exact spot + heading inside the kitchen, illegal spots ig
   assert.ok(r.y < 1.5 && r.y < y1 - 0.01, 'driving continues after the placement');
   void applyPlacement;
 });
+
+test('a saved starting pose (alliance view) is used, mirrored for blue, and ignored if illegal', () => {
+  const pose = { x: 7.2, y: 1.5, th: Math.PI / 2 };
+  const mk = (alliance, p) => new Match({ slots: [{ id: 'a', alliance, station: 2, robot: 'kitbot', pose: p }] }).robots[0];
+  const red = mk('red', pose);
+  assert.deepEqual([red.x, red.y, red.th], [7.2, 1.5, Math.PI / 2]);
+  const blue = mk('blue', pose);
+  assert.deepEqual([blue.x, blue.y, +blue.th.toFixed(4)], [-7.2, 1.5, +(Math.PI / 2).toFixed(4)]);
+  const bad = mk('red', { x: 2, y: 0, th: 0 });
+  assert.equal(bad.x, F.startPose('red', 2).x, 'illegal pose falls back to the default spot');
+});

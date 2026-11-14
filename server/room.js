@@ -176,7 +176,7 @@ export class Room {
       if (sl.type === 'human') {
         const p = this.players.get(sl.pid);
         if (!p) continue;
-        slots.push({ id: s, alliance, station, robot: p.robot, mods: p.mods, load: p.load, name: p.name, team: p.team });
+        slots.push({ id: s, alliance, station, robot: p.robot, mods: p.mods, load: p.load, pose: p.pose, name: p.name, team: p.team });
         p.queue = [];
         p.lastInput = {};
         p.idle = 0;
@@ -188,7 +188,7 @@ export class Room {
       }
     }
     if (!slots.length) return this.sendError(this.players.get(this.host), 'Take a slot or add bots first');
-    this.match = new Match({ slots, autoRamp: this.settings.autoRamp, officialRules: this.settings.officialRules, setup: !!this.setup });
+    this.match = new Match({ slots, autoRamp: this.settings.autoRamp, officialRules: this.settings.officialRules });
     this.match.bots = this.bots;
     this.phase = 'match';
     for (const p of this.players.values()) this.sendStart(p);
