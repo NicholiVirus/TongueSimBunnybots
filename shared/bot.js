@@ -291,7 +291,7 @@ export class Bot {
     this.keepOutOfOpponentZones(r, inp);
 
     // task actions
-    if (t.sp && remaining < 1.6) inp.sp = isOneAtATime(r.cfg.mods) && t.kind === 'pantry' && !r.carriage ? 'stow' : t.sp; // separate elevator reloads low
+    if (t.sp && remaining < 1.6) inp.sp = isOneAtATime(r.cfg.mods) && (t.kind === 'pantry' || (t.kind === 'oven' && shelfSide(r.cfg.mods) < 0)) && !r.carriage ? 'stow' : t.sp; // separate elevator reloads low
     if (t.kind === 'collect' || t.kind === 'table') {
       inp.intake = remaining < 1.5;
       inp.sp = 'stow';
@@ -550,7 +550,7 @@ export class Bot {
       goal: [gx, gy],
       stage: [gx + c.dx * 0.6, gy + c.dy * 0.6],
       direct: true,
-      heading: catchIt ? Math.atan2(c.dy, c.dx) : Math.atan2(-c.dy, -c.dx),
+      heading: catchIt && !r.cfg.slap ? Math.atan2(c.dy, c.dx) : Math.atan2(-c.dy, -c.dx), // (Divebomb's indexer takes depot carrots over its front)
       floor: !catchIt,
       since: m.time,
     };
@@ -596,7 +596,7 @@ export class Bot {
     // carrots -> OVEN through the kitchen-side mouth (a loaded rear trader backs up to it)
     const gx = s * ((F.OVEN.mouthX0 + F.OVEN.mouthX1) / 2 + 0.05);
     const gy = F.OVEN.y1 + half + 0.02;
-    const rear = hasRearTrader(r.cfg.mods) && r.held.length > (r.carriagePiece ? 1 : 0);
+    const rear = (hasRearTrader(r.cfg.mods) && r.held.length > (r.carriagePiece ? 1 : 0)) || shelfSide(r.cfg.mods) < 0;
     return { kind: 'oven', goal: [gx, gy], stage: [gx, gy + 0.6], direct: true, heading: rear ? Math.PI / 2 : -Math.PI / 2, sp: 'oven', heldAtStart: r.held.length, since: m.time };
   }
 

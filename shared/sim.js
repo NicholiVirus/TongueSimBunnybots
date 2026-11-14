@@ -167,11 +167,13 @@ export function alignTarget(r, alliance) {
   const pb = F.pantryBox(alliance);
   const ob = F.ovenBox(alliance);
   const mouthX = (s * (F.OVEN.mouthX0 + F.OVEN.mouthX1)) / 2;
+  // backs up to the oven: a loaded rear trader, or an elevator-on-the-back robot (it feeds the oven from its end effector)
+  const ovenBack = r.ovenRear || shelfSide(r.cfg.mods) < 0;
   const cands = [
     { kind: 'pantry', x: clamp(r.x, pb.x0 + 0.2, pb.x1 - 0.2), y: F.PANTRY.yFront - half - 0.01, th: shelfSide(r.cfg.mods) > 0 ? Math.PI / 2 : -Math.PI / 2 },
     // (a rear trader with carrots aboard backs up to the mouth instead)
-    { kind: 'oven', x: mouthX, y: ob.y1 + half + 0.02, th: r.ovenRear ? Math.PI / 2 : -Math.PI / 2 },
-    { kind: 'oven', x: mouthX, y: ob.y0 - half - 0.02, th: r.ovenRear ? -Math.PI / 2 : Math.PI / 2 },
+    { kind: 'oven', x: mouthX, y: ob.y1 + half + 0.02, th: ovenBack ? Math.PI / 2 : -Math.PI / 2 },
+    { kind: 'oven', x: mouthX, y: ob.y0 - half - 0.02, th: ovenBack ? -Math.PI / 2 : Math.PI / 2 },
     // foot of the RAMP (in front of the oven's tag face): where stored cakes roll down
     { kind: 'ramp', x: s > 0 ? ob.x0 - half - 0.02 : ob.x1 + half + 0.02, y: F.OVEN.yc, th: s > 0 ? 0 : Math.PI },
     // DEPOT chutes in our FARM: park right under the 23" mouth, hopper toward the wall
@@ -820,7 +822,8 @@ export class Match {
       { y: ob.y0, n: [0, 1] },
     ];
     // side +1: the front of the robot at the mouth (claw / elevator). side -1: a rear trader backed up to it
-    for (const side of trader ? [1, -1] : [1]) {
+    const backElev = !trader && shelfSide(r.cfg.mods) < 0 && reloadsFromHopper(r.cfg.mods);
+    for (const side of trader ? [1, -1] : backElev ? [-1] : [1]) {
       const [px, py] = side > 0 ? [fx, fy] : this.rearPoint(r);
       for (const f of mouths) {
         if (!(px > mx0 - 0.1 && px < mx1 + 0.1 && Math.abs(py - f.y) < 0.25)) continue;
@@ -845,10 +848,22 @@ export class Match {
           }
         } else {
           if (!low) continue;
-          // a 526 hopper dumps its own pieces first; the elevator's piece goes last
-          const hopper = r.cfg.mods.mech === 'elevIntake' ? r.held.filter((id) => id !== r.carriagePiece) : null;
-          p = hopper?.length ? this.popHeldId(r, hopper.find((id) => this.pieces.find((q) => q.id === id)?.type === 'carrot') ?? hopper[hopper.length - 1]) : this.popHeld(r, 'carrot');
-          r.lastScore = this.time;
+          if (backElev) {
+            // elevator on the back: the carrot comes out of the end effector, one per lift
+            if (!r.carriage) return this.denied(r, 'End effector empty — lower the elevator (R) to load the next carrot');
+            p = this.popHeld(r, 'carrot');
+            r.carriage = 0;
+            if (r.held.length && r.input.autoStow !== false) {
+              r.returnTo = r.elevTarget;
+              r.elevTarget = 'stow';
+            }
+            r.lastScore = this.time;
+          } else {
+            // a 526 hopper dumps its own pieces first; the elevator's piece goes last
+            const hopper = r.cfg.mods.mech === 'elevIntake' ? r.held.filter((id) => id !== r.carriagePiece) : null;
+            p = hopper?.length ? this.popHeldId(r, hopper.find((id) => this.pieces.find((q) => q.id === id)?.type === 'carrot') ?? hopper[hopper.length - 1]) : this.popHeld(r, 'carrot');
+            r.lastScore = this.time;
+          }
         }
         const to = { x: (mx0 + mx1) / 2, y: F.OVEN.yc, z: 0.2, th: 0 };
         this.startPlace(p, r, to, 'oven', 0.3);
@@ -1305,13 +1320,14 @@ export class Match {
       F.depotChutes(a).forEach((c, ci) => {
         inv.chuteTimers[ci] = Math.max(0, inv.chuteTimers[ci] - dt);
         if (!live || inv.chuteTimers[ci] > 0 || inv.depotCarrots <= 0) return;
+        // (a slapdown intake must be stowed to catch: the depot feeds Divebomb's indexer)
         // depot-intake robots catch straight from the mouth; ground-intake-only robots waiting out front
         // get the carrot rolled onto the carpet toward them (one at a time)
         const r = this.robots.find(
           (q) =>
             q.alliance === a &&
             q.held.length + this.incoming(q) < F.MAX_HELD &&
-            ((q.cfg.mods.depot && this.inCatchZone(q, c)) || (!q.cfg.mods.depot && q.cfg.mods.ground && this.waitingForRoll(q, c))),
+            ((q.cfg.mods.depot && this.inCatchZone(q, c) && (!q.cfg.slap || q.arm >= q.cfg.slap.stow - 15)) || (!q.cfg.mods.depot && q.cfg.mods.ground && this.waitingForRoll(q, c))),
         );
         if (!r) return;
         inv.depotCarrots--;

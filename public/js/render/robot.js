@@ -428,11 +428,11 @@ export class RobotView {
         const m = t === 'k' ? pair.k : pair.c;
         if (i < inEnd) m.position.set(-0.316, 0.452 + travel - F.PIECE.radius, 0);
         else {
-          // indexer carrots rest on the slanted polycarb lip (rises 10° toward the intake): centre = a
-          // radius out along the slope's normal from the contact point
-          const th = (10 * Math.PI) / 180;
-          const ys = i - inEnd ? 0.2 : 0.35; // contact points along the lip (m)
-          const zs = 0.176 * ys + 0.391 + 0.005;
+          // indexer carrots ride on the beltdexer belts (CAD: pulleys at y -108 / +92 mm, rising ~10° toward
+          // the intake): centre = a radius out along the belt's normal from the contact point
+          const th = Math.atan2(0.036, 0.2);
+          const ys = i - inEnd ? 0.105 : -0.05; // contact points along the belts (m); the next carrot is nearest the elevator
+          const zs = 0.377 + Math.tan(th) * (ys + 0.108);
           m.position.set(ys - F.PIECE.radius * Math.sin(th), zs + F.PIECE.radius * Math.cos(th) - F.PIECE.radius, 0);
         }
       }

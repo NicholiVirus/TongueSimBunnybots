@@ -16,7 +16,7 @@ const run = (m, s) => {
 
 test('Divebomb always plays its real build: ground intake only, L1/L2, one piece per lift', () => {
   const [m, r] = solo();
-  assert.deepEqual(r.cfg.mods, { ground: true, depot: false, ramp: false, maxLevel: 2, mech: 'opposite' });
+  assert.deepEqual(r.cfg.mods, { ground: true, depot: true, ramp: false, maxLevel: 2, mech: 'opposite' });
   m.setInput('a', { sp: 'l3' });
   run(m, 2);
   assert.notEqual(r.elevTarget, 'l3', 'no LEVEL 3');
@@ -78,4 +78,36 @@ test('bots can drive Divebomb', () => {
     console.log(a, m.score[a].totals, 'oven', m.score[a].ovenCarrot);
     assert.ok(m.score[a].totals.total >= 20, `${a} scored ${m.score[a].totals.total}`);
   }
+});
+
+test('oven: carrots come out of the end effector (back), one per lift', () => {
+  const [m, r] = solo(2);
+  run(m, 1);
+  r.x = (F.OVEN.mouthX0 + F.OVEN.mouthX1) / 2;
+  r.y = F.OVEN.y1 + r.cfg.length / 2 + 0.01;
+  r.th = -Math.PI / 2; // front at the mouth: wrong end
+  m.setInput('a', { score: true });
+  run(m, 1);
+  assert.equal(r.held.length, 2, 'nothing goes in from the intake side');
+  r.th = Math.PI / 2; // back (end effector) at the mouth
+  run(m, 3);
+  assert.equal(r.held.length, 0, 'both carrots fed in, reloading the end effector in between');
+  assert.equal(m.score.red.ovenCarrot, 2);
+});
+
+test('depot: with the intake stowed, carrots drop into the beltdexer', () => {
+  const [m, r] = solo(0);
+  const c = F.depotChutes('red')[0];
+  r.x = c.x + c.dx * (r.cfg.length / 2 + 0.05);
+  r.y = c.y + c.dy * (r.cfg.length / 2 + 0.05);
+  r.th = Math.atan2(-c.dy, -c.dx); // front (indexer side) toward the chute
+  m.setInput('a', { intake: true }); // intake down: no depot feed
+  run(m, 0.5);
+  m.inv.red.depotCarrots = 5;
+  run(m, 2);
+  // not caught from the chute while deployed (one may roll out onto the carpet and get picked up)
+  assert.ok(r.held.length <= 1, `held ${r.held.length}`);
+  m.setInput('a', {});
+  run(m, 5);
+  assert.equal(r.held.length, 3, 'indexer fills (2) + end effector (1)');
 });
