@@ -1,5 +1,5 @@
 import { TICK } from '/shared/sim.js';
-import { ROBOTS, ROBOT_IDS, getRobotConfig, sanitizeMods, modsLabel, randomMods, MECHS, TEAM_LOCKS, buildFor } from '/shared/robots.js';
+import { ROBOTS, ROBOT_IDS, getRobotConfig, sanitizeMods, modsLabel, randomMods, MECHS, TEAM_LOCKS, buildFor, sanitizeLoad } from '/shared/robots.js';
 import { SceneView } from './render/scene.js';
 import { Input } from './input.js';
 import { Hud, renderResults } from './hud.js';
@@ -74,7 +74,11 @@ for (const id of ROBOT_IDS) {
 $('in-name').value = settings.name;
 $('in-team').value = settings.team;
 robotSel.value = ROBOTS[settings.robot] ? settings.robot : 'team';
-const updateBlurb = () => ($('robot-blurb').textContent = getRobotConfig(robotSel.value).blurb || '');
+$('in-load').value = sanitizeLoad(settings.load);
+const updateBlurb = () => {
+  $('robot-blurb').textContent = getRobotConfig(robotSel.value).blurb || '';
+  $('load-row').classList.toggle('hidden', getRobotConfig(robotSel.value).mods.mech !== 'claw'); // only Charles has a choice
+};
 updateBlurb();
 // mechanism configuration
 const readMods = () => sanitizeMods({ ground: $('cfg-ground').checked, depot: $('cfg-depot').checked, ramp: $('cfg-ramp').checked, maxLevel: Number($('cfg-level').value), mech: $('cfg-mech').value });
@@ -109,9 +113,10 @@ const profile = () => ({
   name: $('in-name').value.trim() || 'Driver',
   team: $('in-team').value.replace(/\D/g, '').slice(0, 5) || DEFAULT_TEAM,
   robot: robotSel.value,
+  load: sanitizeLoad($('in-load').value),
   mods: buildLock() ? sanitizeMods(MECHS[settings.mods?.mech] ? settings.mods : null) : readMods(),
 });
-for (const el of [$('in-name'), $('in-team'), robotSel]) {
+for (const el of [$('in-name'), $('in-team'), robotSel, $('in-load')]) {
   el.addEventListener('change', () => {
     Object.assign(settings, profile());
     saveSettings();
@@ -150,6 +155,7 @@ const actions = {
       station: Number($('pr-station').value),
       robot: p.robot,
       mods: p.mods,
+      load: p.load,
       name: p.name,
       team: p.team,
       allies: Number($('pr-allies').value),

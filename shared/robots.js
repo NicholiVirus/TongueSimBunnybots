@@ -123,6 +123,10 @@ export const hasGripper = (mods) => mods?.mech === 'elevIntake' || mods?.mech ==
 // the hopper is a trader on the BACK of the robot: depot carrots only, fired into the oven rear-first
 export const hasRearTrader = (mods) => mods?.mech === 'claw';
 // the build a robot actually plays with: a preset's fixed build wins, then a team lock, then the menu
+// Charles' starting load (2 preloaded carrots): both in the rear trader, one in the trader + one in the
+// claw, or two side by side in the claw (gripped only at their ends/sides)
+export const LOADS = { trader2: '2 carrots in the trader (back)', split: '1 in the trader + 1 in the claw', claw2: '2 side by side in the claw' };
+export const sanitizeLoad = (l) => (LOADS[l] ? l : 'trader2');
 export const buildFor = (robot, team, mods) => sanitizeMods(ROBOTS[robot]?.build || TEAM_LOCKS[String(team ?? '')] || mods);
 // the elevator reloads from the hopper at the bottom
 export const reloadsFromHopper = (mods) => mods?.mech === 'separate' || mods?.mech === 'opposite';

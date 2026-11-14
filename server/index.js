@@ -6,7 +6,7 @@ import { WebSocketServer } from 'ws';
 import { Room } from './room.js';
 import { openStore } from './store.js';
 import { Leaderboard, BOARDS } from './leaderboard.js';
-import { ROBOTS, sanitizeMods, modsLabel } from '../shared/robots.js';
+import { ROBOTS, sanitizeMods, modsLabel, sanitizeLoad } from '../shared/robots.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const PORT = Number(process.env.PORT) || 3000;
@@ -129,6 +129,7 @@ wss.on('connection', (ws) => {
           .slice(0, 5);
         if (ROBOTS[msg.robot]) player.robot = msg.robot;
         if (msg.mods) player.mods = sanitizeMods(msg.mods);
+        if (msg.load) player.load = sanitizeLoad(msg.load);
         break;
       case 'ping':
         player.send({ t: 'pong', ts: msg.ts });

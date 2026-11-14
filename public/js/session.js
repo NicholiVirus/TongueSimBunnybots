@@ -97,8 +97,23 @@ const toSimInput = (i) => ({ seq: i.seq, mx: i.mx, my: i.my, rot: i.rot, intake:
 
 // ------------------------------------------------------------------ offline
 export class LocalSession {
-  constructor({ alliance = 'red', station = 2, robot = 'team', mods, name = 'You', team = '', allies = 2, opps = 3, skill = 0.85, autoRamp = false, officialRules = false, setup = false, bots }) {
-    this.opts = { alliance, station, robot, mods, name, team, allies, opps, skill, autoRamp, officialRules, setup, bots };
+  constructor({
+    alliance = 'red',
+    station = 2,
+    robot = 'team',
+    mods,
+    name = 'You',
+    team = '',
+    allies = 2,
+    opps = 3,
+    skill = 0.85,
+    autoRamp = false,
+    officialRules = false,
+    setup = false,
+    load,
+    bots,
+  }) {
+    this.opts = { alliance, station, robot, mods, name, team, allies, opps, skill, autoRamp, officialRules, setup, load, bots };
     this.local = true;
     this.reset();
   }
@@ -106,7 +121,7 @@ export class LocalSession {
   reset() {
     const { alliance, station, robot, mods, name, team, allies, opps, skill } = this.opts;
     const other = alliance === 'red' ? 'blue' : 'red';
-    const slots = [{ id: `${alliance}${station}`, alliance, station, robot, mods, name, team }];
+    const slots = [{ id: `${alliance}${station}`, alliance, station, robot, mods, name, team, load: this.opts.load }];
     const pool = ['kitbot', 'speedy', 'tank'];
     const allyStations = [1, 2, 3].filter((s) => s !== station).slice(0, allies);
     // per-bot robot + mechanisms from the practice menu; anything unset gets a random build (kept across restarts)

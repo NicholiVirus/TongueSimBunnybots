@@ -2,7 +2,7 @@
 // (online play) and in the browser (offline practice). Fixed 60 Hz step.
 
 import * as F from './field.js';
-import { getRobotConfig, isOneAtATime, reloadsFromHopper, shelfSide, buildFor, hasGripper, hasRearTrader, clawPose } from './robots.js';
+import { getRobotConfig, isOneAtATime, reloadsFromHopper, shelfSide, buildFor, hasGripper, hasRearTrader, clawPose, sanitizeLoad } from './robots.js';
 
 export const TICK = 1 / 60;
 
@@ -362,6 +362,12 @@ export class Match {
         r.held.push(pc.id);
         preloads[r.alliance]++;
       }
+      // Charles chooses where its two preloaded carrots start
+      const load = sanitizeLoad(slots.find((s) => s.id === r.id)?.load);
+      if (hasRearTrader(r.cfg.mods) && r.held.length && load !== 'trader2') {
+        r.carriagePiece = r.held[r.held.length - 1];
+        if (load === 'claw2' && r.held.length >= 2) r.clawPair = r.held[r.held.length - 2];
+      }
     }
     for (const a of F.ALLIANCES) {
       this.inv[a].depotCarrots = F.CARROTS_PER_ALLIANCE - F.PRESTAGED_CARROTS - preloads[a];
@@ -503,6 +509,8 @@ export class Match {
     if (hasGripper(mods)) {
       // the end effector is the ground intake: it holds one piece (always the last in `held`)
       if (r.carriagePiece && !r.held.includes(r.carriagePiece)) r.carriagePiece = null;
+      if (r.clawPair && !r.held.includes(r.clawPair)) r.clawPair = null;
+      this.promoteClaw(r);
       r.carriage = r.carriagePiece ? 1 : 0;
       if (r.intake && r.carriagePiece) {
         r.intake = false;
@@ -766,7 +774,7 @@ export class Match {
         if ((fwdX * f.n[0] + fwdY * f.n[1]) * side < Math.cos((40 * Math.PI) / 180)) continue;
         let p;
         if (trader) {
-          const hopper = r.held.filter((id) => id !== r.carriagePiece);
+          const hopper = r.held.filter((id) => id !== r.carriagePiece && id !== r.clawPair);
           if (side < 0) {
             if (!hopper.length) return this.denied(r, 'Trader is empty — the claw scores out the FRONT');
             p = this.popHeldId(r, hopper[hopper.length - 1]);
@@ -826,18 +834,29 @@ export class Match {
   popHeldId(r, id) {
     const i = r.held.indexOf(id);
     const [pid] = r.held.splice(i < 0 ? r.held.length - 1 : i, 1);
-    const inClaw = pid === r.carriagePiece;
-    if (inClaw) r.carriagePiece = null;
+    const inClaw = pid === r.carriagePiece || pid === r.clawPair;
+    if (pid === r.carriagePiece) r.carriagePiece = null;
+    if (pid === r.clawPair) r.clawPair = null;
+    this.promoteClaw(r);
     const p = this.pieces.find((q) => q.id === pid);
     Object.assign(p, this.heldWorldPos(r, r.held.length, inClaw));
     p.holder = null;
     return p;
   }
 
-  // a hopper fills underneath the gripper's piece, which stays last in `held`
+  // a hopper fills underneath the gripper's piece(s), which stay last in `held`
   addHeld(r, id) {
-    if (hasGripper(r.cfg.mods) && r.carriagePiece) r.held.splice(r.held.length - 1, 0, id);
+    const k = (r.carriagePiece ? 1 : 0) + (r.clawPair ? 1 : 0);
+    if (hasGripper(r.cfg.mods) && k) r.held.splice(r.held.length - k, 0, id);
     else r.held.push(id);
+  }
+
+  // the second carrot of a two-carrot claw takes over once the first is gone
+  promoteClaw(r) {
+    if (!r.carriagePiece && r.clawPair) {
+      r.carriagePiece = r.clawPair;
+      r.clawPair = null;
+    }
   }
 
   // The mechanism hands over the preferred piece type first (cakes to the pantry, carrots to the oven).
@@ -869,6 +888,8 @@ export class Match {
     const rear = hasRearTrader(r.cfg.mods) && !r.carriagePiece;
     const p = this.popHeld(r);
     if (p.id === r.carriagePiece) r.carriagePiece = null;
+    if (p.id === r.clawPair) r.clawPair = null;
+    this.promoteClaw(r);
     const [fx, fy] = rear ? this.rearPoint(r, PR + 0.06) : this.frontPoint(r, PR + 0.06);
     const dir = rear ? -1 : 1;
     p.x = fx;
@@ -1446,7 +1467,8 @@ export class Match {
           (r.tongue ? 16 : 0) |
           (r.stunUntil > this.time ? 32 : 0) |
           (r.rampAligned ? 64 : 0) |
-          (r.ovenRear ? 128 : 0),
+          (r.ovenRear ? 128 : 0) |
+          (r.clawPair ? 256 : 0),
         r3(r.vx),
         r3(r.vy),
         r3(r.w),

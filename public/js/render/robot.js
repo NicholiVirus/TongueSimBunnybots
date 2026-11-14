@@ -396,7 +396,7 @@ export class RobotView {
       this.rig.carriage.position.y = travel;
       this.rig.arm.rotation.z = ((st.arm ?? this.cfg.arm.stow) * Math.PI) / 180;
       // one piece locked in the claw (the last in `held`), the rest ride in the rear trader
-      const inClaw = st.flags & 8 ? 1 : 0;
+      const inClaw = st.flags & 8 ? 1 + (st.flags & 256 ? 1 : 0) : 0;
       const cp = clawPose(this.cfg, st.elev, st.arm ?? this.cfg.arm.stow);
       for (let i = 0; i < this.heldMeshes.length; i++) {
         const pair = this.heldMeshes[i];
@@ -404,8 +404,12 @@ export class RobotView {
         pair.c.visible = t === 'c';
         pair.k.visible = t === 'k';
         const m = t === 'k' ? pair.k : pair.c;
-        if (i < inClaw) m.position.set(cp.x, cp.z, 0);
-        else m.position.set(TRADER_SLOTS[i - inClaw][0], TRADER_SLOTS[i - inClaw][1], 0);
+        if (i < inClaw) {
+          // two carrots side by side along the arm, each gripped only at its sides
+          const a = ((st.arm ?? this.cfg.arm.stow) * Math.PI) / 180;
+          const off = inClaw === 2 ? (i === 0 ? -0.077 : 0.077) : 0;
+          m.position.set(cp.x + off * Math.cos(a), cp.z + off * Math.sin(a), 0);
+        } else m.position.set(TRADER_SLOTS[i - inClaw][0], TRADER_SLOTS[i - inClaw][1], 0);
       }
       return;
     }

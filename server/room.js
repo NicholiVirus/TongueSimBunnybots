@@ -1,6 +1,6 @@
 import { Match, TICK } from '../shared/sim.js';
 import { Bot } from '../shared/bot.js';
-import { ROBOTS, sanitizeMods, buildFor } from '../shared/robots.js';
+import { ROBOTS, sanitizeMods, buildFor, sanitizeLoad } from '../shared/robots.js';
 
 export const SLOT_IDS = ['red1', 'red2', 'red3', 'blue1', 'blue2', 'blue3'];
 const SNAP_EVERY = 2; // 60 Hz sim -> 30 Hz snapshots
@@ -106,6 +106,7 @@ export class Room {
       case 'robot':
         if (ROBOTS[msg.robot]) player.robot = msg.robot;
         if (msg.mods) player.mods = sanitizeMods(msg.mods);
+        if (msg.load) player.load = sanitizeLoad(msg.load);
         this.broadcastRoom();
         break;
       case 'bot': {
@@ -175,7 +176,7 @@ export class Room {
       if (sl.type === 'human') {
         const p = this.players.get(sl.pid);
         if (!p) continue;
-        slots.push({ id: s, alliance, station, robot: p.robot, mods: p.mods, name: p.name, team: p.team });
+        slots.push({ id: s, alliance, station, robot: p.robot, mods: p.mods, load: p.load, name: p.name, team: p.team });
         p.queue = [];
         p.lastInput = {};
         p.idle = 0;

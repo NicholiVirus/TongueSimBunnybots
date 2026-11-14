@@ -86,6 +86,7 @@ The default robot (**Charles (611)**) is the team's real 2026 robot: the 3D mode
 - **Shelves:** raise to L1/L2/L3 (21" / 33" / 48" of travel), face the PANTRY, press **F** — the arm tips forward and places the claw's piece. The claw can also feed the OVEN from the front.
 - **Trader** (rear hopper): takes up to 3 carrots from the DEPOT (back the trader up to the chute) and fires them into the OVEN **out the back** in well under a second. Auto-align (Space) turns the right end toward the oven/depot for you.
 - 3 pieces total aboard (G14): e.g. 2 carrots in the trader + 1 piece in the claw.
+- **Starting load** (menu, shown when Charles is selected; saved per browser): your 2 preloaded carrots start either **both in the trader**, **one in the trader + one in the claw**, or **two side by side in the claw** (gripped only at their sides). With two in the claw, each score releases one and the other takes its place — slide along the shelf to the next gap between them.
 - Bots can drive Charles too. **Custom robot**, **Speedy Swerve** and **Heavy Hauler** are still procedural placeholders with configurable mechanisms.
 
 To rebuild the model from a new STEP export: `pip install cadquery-ocp trimesh`, run `python3 tools/step_to_glb.py robot.step raw.glb`, then `npx gltfpack -i raw.glb -o public/assets/robots/team/charles.glb -si 0.3 -cc -kn -km`. The script sorts parts into moving groups (elevator stage, carriage, arm, swerve wheels) by their names in the CAD tree. For a different team's CAD, see [`public/assets/robots/README.md`](public/assets/robots/README.md).

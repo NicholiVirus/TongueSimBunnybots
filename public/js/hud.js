@@ -170,7 +170,7 @@ export class Hud {
       `<span class="${me.flags & 2 ? 'on' : ''}">TAXI ${me.flags & 2 ? '✓' : '·'}</span>`,
       `<span class="${me.flags & 1 ? 'on' : ''}">INTAKE</span>`,
       cfg.mods?.mech === 'claw'
-        ? `<span class="${me.flags & 8 ? 'on' : ''}">CLAW ${me.flags & 8 ? (held[held.length - 1] === 'k' ? '🍰' : '🥕') : 'empty'}</span><span class="${held.length - (me.flags & 8 ? 1 : 0) ? 'on' : ''}">TRADER ${held.length - (me.flags & 8 ? 1 : 0)}🥕</span>`
+        ? `<span class="${me.flags & 8 ? 'on' : ''}">CLAW ${me.flags & 8 ? (held[held.length - 1] === 'k' ? '🍰' : '🥕') + (me.flags & 256 ? '×2' : '') : 'empty'}</span><span class="${held.length - (me.flags & 8 ? (me.flags & 256 ? 2 : 1) : 0) ? 'on' : ''}">TRADER ${held.length - (me.flags & 8 ? (me.flags & 256 ? 2 : 1) : 0)}🥕</span>`
         : '',
       (cfg.mods?.mech === 'separate' || cfg.mods?.mech === 'opposite') && held.length
         ? `<span class="${me.flags & 8 ? 'on' : ''}">CARRIAGE ${me.flags & 8 ? 'LOADED' : 'reloading — stow'}</span>`
