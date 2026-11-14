@@ -410,7 +410,7 @@ export class RobotView {
           // (piece meshes are positioned by their underside) and the carrot rides up a few cm into the
           // claw when it is stowed or in tongue mode
           const stow = Math.max(0, Math.min(1, ((st.arm ?? 0) - 85) / 14));
-          const lift = 0.05 * Math.max(stow, this.tongueOut || 0);
+          const lift = 0.1 * Math.max(stow, this.tongueOut || 0);
           m.position.set(cp.x, cp.z - F.PIECE.radius + lift, off);
         } else m.position.set(TRADER_SLOTS[i - inClaw][0], TRADER_SLOTS[i - inClaw][1], 0);
       }

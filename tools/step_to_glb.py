@@ -98,6 +98,8 @@ def classify(path, nm, bb):
     m = [p for p in full if p.startswith('SDS MK5n <')]
     if m and (nm.startswith('SDS MK5 Molded Wheel') or nm.startswith('SDS MK5 Turret')):
         return 'wheel' + m[0][-2]
+    # the elevator-top camera and its holder ride on the middle stage
+    if len(path) == 1 and nm in ('id11', 'id21', 'Part 1') and bb[0][2] > 1000: return 'stage'
     if 'Bumper AS <1>' in path and nm == 'Part 6': return 'bumper'
     # clear polycarbonate panels of the trader
     if nm in ('poly side plate', 'poly backing', 'Part 14') or nm.startswith('Did some say'): return 'glass'
