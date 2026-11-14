@@ -750,13 +750,37 @@ export class Match {
       const shelf = this.pantry[a][level];
       const xs = this.shelfXs(a, level);
       if (shelfFit(xs, ex, a) === null) return this.denied(r, `LEVEL ${level + 1} is full`);
-      const px = shelfFit(xs, ex, a, 0.12);
+      // a claw holding two carrots drops both at once, end to end
+      const pair = !!(r.clawPair && r.carriagePiece);
+      const half = PIECE.length / 2 + 0.0005;
+      let px = null;
+      if (pair) {
+        let bd = 0.12;
+        for (let d = -0.12; d <= 0.1201; d += 0.01) {
+          const c = ex + d;
+          const left = shelfFit(xs, c - half, a, 0.001);
+          if (left === null || shelfFit([...xs, left], c + half, a, 0.001) === null) continue;
+          if (Math.abs(d) <= bd) {
+            bd = Math.abs(d);
+            px = c;
+          }
+        }
+        if (px === null) return this.denied(r, 'No room for both carrots there — slide left/right to a wider gap');
+      } else px = shelfFit(xs, ex, a, 0.12);
       if (px === null) return this.denied(r, 'No room there — slide left/right to a gap');
       if (!this.armReady(r, 'pantry')) return false; // arm still swinging out
-      const p = hasGripper(r.cfg.mods) ? this.popHeldId(r, r.carriagePiece) : this.popHeld(r, 'cake');
-      shelf.push(p.id);
-      const to = { x: px, y: (F.PANTRY.yFront + F.PANTRY.yBack) / 2 + 0.005, z: F.PANTRY.shelfZ[level], th: 0 };
-      this.startPlace(p, r, to, 'pantry', 0.22);
+      const first = hasGripper(r.cfg.mods) ? this.popHeldId(r, r.clawPair ?? r.carriagePiece) : this.popHeld(r, 'cake');
+      const batch = [first];
+      if (pair) batch.push(this.popHeldId(r, r.carriagePiece));
+      batch.forEach((p, i) => {
+        shelf.push(p.id);
+        const cx = pair ? px + (i ? half : -half) : px;
+        const to = { x: cx, y: (F.PANTRY.yFront + F.PANTRY.yBack) / 2 + 0.005, z: F.PANTRY.shelfZ[level], th: 0 };
+        this.startPlace(p, r, to, 'pantry', 0.22);
+        p.owner = a;
+        p.level = level;
+        this.emit({ type: 'score', alliance: a, pts: F.POINTS.pantry[p.type][level], label: `L${level + 1} ${p.type === 'cake' ? 'CAKE' : 'CARROT'}`, x: to.x, y: to.y, z: to.z, robot: r.id });
+      });
       if (reloadsFromHopper(r.cfg.mods)) {
         r.carriage = 0;
         if (r.held.length && r.input.autoStow !== false) {
@@ -764,10 +788,6 @@ export class Match {
           r.elevTarget = 'stow';
         }
       }
-      p.owner = a;
-      p.level = level;
-      const pts = F.POINTS.pantry[p.type][level];
-      this.emit({ type: 'score', alliance: a, pts, label: `L${level + 1} ${p.type === 'cake' ? 'CAKE' : 'CARROT'}`, x: to.x, y: to.y, z: to.z, robot: r.id });
       r.lastScore = this.time;
       this.afterScore(r);
       return true;
@@ -793,6 +813,7 @@ export class Match {
         if (!(px > mx0 - 0.1 && px < mx1 + 0.1 && Math.abs(py - f.y) < 0.25)) continue;
         if ((fwdX * f.n[0] + fwdY * f.n[1]) * side < Math.cos((40 * Math.PI) / 180)) continue;
         let p;
+        let extra = null;
         if (trader) {
           const hopper = r.held.filter((id) => id !== r.carriagePiece && id !== r.clawPair);
           if (side < 0) {
@@ -805,7 +826,8 @@ export class Match {
             if (!r.carriagePiece) return this.denied(r, 'Turn around — the trader fires carrots out the BACK');
             if (!low) return this.denied(r, 'Lower the elevator to feed the OVEN');
             if (!this.armReady(r, 'oven')) return false;
-            p = this.popHeldId(r, r.carriagePiece);
+            extra = r.clawPair && r.carriagePiece ? r.carriagePiece : null; // two in the claw go in together
+            p = this.popHeldId(r, r.clawPair ?? r.carriagePiece);
             r.lastScore = this.time;
           }
         } else {
@@ -822,6 +844,14 @@ export class Match {
         this.emit({ type: 'score', alliance: a, pts, label: `OVEN ${p.type === 'cake' ? 'CAKE' : 'CARROT'}`, x: to.x, y: to.y, z: 0.6, robot: r.id });
         if (p.type === 'carrot') this.score[a].ovenCarrot++;
         else this.score[a].ovenCake++;
+        if (extra) {
+          const p2 = this.popHeldId(r, extra);
+          this.startPlace(p2, r, to, 'oven', 0.3);
+          p2.owner = a;
+          this.emit({ type: 'score', alliance: a, pts: F.POINTS.oven[p2.type], label: `OVEN ${p2.type === 'cake' ? 'CAKE' : 'CARROT'}`, x: to.x, y: to.y, z: 0.6, robot: r.id });
+          if (p2.type === 'carrot') this.score[a].ovenCarrot++;
+          else this.score[a].ovenCake++;
+        }
         this.afterScore(r);
         return true;
       }

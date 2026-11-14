@@ -154,20 +154,31 @@ test('starting load: 2 in the trader, 1+1, or 2 side by side in the claw', () =>
   [m, r] = start('claw2');
   assert.deepEqual([r.held.length, !!r.carriagePiece, !!r.clawPair], [2, true, true], 'two in the claw');
   assert.equal(m.inv.red.depotCarrots, F.CARROTS_PER_ALLIANCE - F.PRESTAGED_CARROTS - 2, 'preloads still come out of the depot');
-  // score the claw's carrots one at a time from a shelf; the second takes over
   while (m.phase === 'countdown') m.step();
   assert.equal(m.snapshot().r[0][6] & (8 | 256), 8 | 256, 'snapshot flags show a double claw');
   r.x = F.pantrySlotX(2, 1);
   r.y = F.PANTRY.yFront - r.cfg.length / 2;
   r.th = Math.PI / 2;
+  // both carrots are dropped together, end to end on the shelf
   m.setInput('a', { sp: 'l2' });
   run(m, 1.5);
   m.setInput('a', { score: true });
-  run(m, 1);
-  assert.equal(r.held.length, 1);
-  assert.ok(r.carriagePiece && !r.clawPair, 'the other carrot is now the claw piece');
-  r.x += 0.6; // slide to the next gap
-  run(m, 1);
+  run(m, 1.2);
+  assert.equal(r.held.length, 0, 'both left the claw at once');
   assert.equal(m.score.red.pantry[1].carrot, 2, 'both carrots end up on LEVEL 2');
+  const xs = m.shelfXs('red', 1).sort((p, q) => p - q);
+  assert.ok(Math.abs(xs[1] - xs[0] - F.PIECE.length) < 0.01, 'placed end to end');
+});
+
+test('two carrots in the claw go into the oven together', () => {
+  const m = new Match({ slots: [{ id: 'a', alliance: 'red', station: 1, robot: 'team', load: 'claw2' }] });
+  const r = m.robots[0];
+  while (m.phase === 'countdown') m.step();
+  r.x = (F.OVEN.mouthX0 + F.OVEN.mouthX1) / 2;
+  r.y = F.OVEN.y1 + r.cfg.length / 2 + 0.01;
+  r.th = -Math.PI / 2;
+  m.setInput('a', { score: true });
+  run(m, 1.2);
   assert.equal(r.held.length, 0);
+  assert.equal(m.score.red.totals.oven, 4, 'both carrots scored (2 pts each)');
 });
