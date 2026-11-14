@@ -146,3 +146,15 @@ test('oven: intake stays up unless it has a carrot; ramp cakes caught over the b
   run(m, 0.5);
   assert.equal(r.carriage, 0, 'and back down into the beltdexer when L1 is released');
 });
+
+test('oven: line up and press F, no oven button needed', () => {
+  const [m, r] = solo(2);
+  r.x = (F.OVEN.mouthX0 + F.OVEN.mouthX1) / 2;
+  r.y = F.OVEN.y1 + r.cfg.length / 2 + 0.3;
+  r.th = 0;
+  m.setInput('a', { align: true });
+  run(m, 1.5);
+  m.setInput('a', { align: true, score: true });
+  run(m, 3);
+  assert.equal(m.score.red.ovenCarrot, 2, 'both carrots shot into the oven');
+});

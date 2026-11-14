@@ -598,8 +598,12 @@ export class Match {
     // (526 scores through its intake: when not intaking it holds the pose for the chosen target, e.g. L1 / oven;
     // with an empty arm it goes back to the hand-off pose so the beltdexer can pass it the next carrot)
     const gtake = r.cfg.mods.mech === 'gtake';
-    // the arm stays up at the hand-off pose unless it has a carrot to score (then it goes to the L1 / oven pose)
-    const rest = (!gtake || r.carriage) && S[r.elevTarget] !== undefined && r.elevTarget !== 'ground' ? r.elevTarget : 'stow';
+    // the arm stays up at the hand-off pose unless it has a carrot to score (then it goes to the L1 / oven pose).
+    // 526: F anywhere except L1 is an oven shot, whether or not the oven button was pressed first
+    if (gtake && r.input?.score && r.elevTarget !== 'l1') r.ovenShotUntil = this.time + 1.5;
+    const ovenShot = gtake && this.time < (r.ovenShotUntil || 0);
+    const target = ovenShot ? 'oven' : r.elevTarget;
+    const rest = (!gtake || r.carriage) && S[target] !== undefined && target !== 'ground' ? target : 'stow';
     const want = feeding ? 'feed' : wantDown ? 'ground' : rest;
     r.arm += clamp(S[want] - r.arm, -S.speed * dt, S.speed * dt);
     r.grab = wantDown && !feeding && r.arm <= S.ground + S.tolerance;
@@ -607,8 +611,7 @@ export class Match {
     if (gtake) {
       // carrots live in the beltdexer. One goes up into the arm only to score: while L1 is selected, or for an
       // oven shot (F with the oven selected). Otherwise the arm hands it back down to the beltdexer.
-      if (r.input?.score && r.elevTarget === 'oven') r.ovenShotUntil = this.time + 1.5;
-      const wantLoad = r.elevTarget === 'l1' || (r.elevTarget === 'oven' && this.time < (r.ovenShotUntil || 0));
+      const wantLoad = r.elevTarget === 'l1' || ovenShot;
       r.carriage = wantLoad ? Math.min(r.carriage || 0, r.held.length) : 0;
       if (wantLoad && !r.carriage && r.held.length && Math.abs(r.arm - S.stow) <= S.tolerance) {
         r.loadT = (r.loadT || 0) + dt;
