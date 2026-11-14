@@ -564,8 +564,8 @@ export class Match {
 
     if (!en) return;
     // (a claw robot keeps trying for a moment after a quick tap, while its arm swings into place)
-    if (inp.score) r.scoreLatch = this.time + 0.35;
-    const wantScore = inp.score || (r.cfg.arm && this.time < (r.scoreLatch || 0));
+    if (inp.score) r.scoreLatch = this.time + (r.cfg.slap?.oven !== undefined ? 1.5 : 0.35); // (526: load, swing down, shoot)
+    const wantScore = inp.score || ((r.cfg.arm || r.cfg.slap?.oven !== undefined) && this.time < (r.scoreLatch || 0));
     if (wantScore && this.time - r.lastScore >= r.cfg.scoreCooldown && r.held.length && this.tryScore(r)) r.scoreLatch = 0;
     if (inp.eject && !r.prevEject && r.held.length) this.eject(r);
     r.prevEject = !!inp.eject;
@@ -605,9 +605,12 @@ export class Match {
     r.grab = wantDown && !feeding && r.arm <= S.ground + S.tolerance;
     r.intake = wantDown && !feeding; // rollers only spin while it's down
     if (gtake) {
-      // the beltdexer hands one carrot up into the arm while it sits at the hand-off pose
-      r.carriage = Math.min(r.carriage || 0, r.held.length);
-      if (!r.carriage && r.held.length && Math.abs(r.arm - S.stow) <= S.tolerance) {
+      // carrots live in the beltdexer. One goes up into the arm only to score: while L1 is selected, or for an
+      // oven shot (F with the oven selected). Otherwise the arm hands it back down to the beltdexer.
+      if (r.input?.score && r.elevTarget === 'oven') r.ovenShotUntil = this.time + 1.5;
+      const wantLoad = r.elevTarget === 'l1' || (r.elevTarget === 'oven' && this.time < (r.ovenShotUntil || 0));
+      r.carriage = wantLoad ? Math.min(r.carriage || 0, r.held.length) : 0;
+      if (wantLoad && !r.carriage && r.held.length && Math.abs(r.arm - S.stow) <= S.tolerance) {
         r.loadT = (r.loadT || 0) + dt;
         if (r.loadT >= LOAD_TIME) {
           r.carriage = 1;
@@ -875,7 +878,7 @@ export class Match {
         } else {
           if (!low) continue;
           if (r.cfg.slap?.oven !== undefined) {
-            if (!r.carriage) return this.denied(r, 'Arm empty — it is taking the next carrot from the beltdexer');
+            if (!r.carriage) return false; // the beltdexer is still handing a carrot up to the arm
             if (Math.abs(r.arm - r.cfg.slap.oven) > r.cfg.slap.tolerance) return false; // intake still swinging down to the mouth
             r.carriage = 0;
           }

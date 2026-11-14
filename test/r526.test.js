@@ -56,9 +56,13 @@ test('scores LEVEL 1 and the oven back out through the intake', () => {
   r.th = -Math.PI / 2;
   m.setInput('a', { sp: 'oven' });
   run(m, 1);
+  assert.equal(r.carriage, 0, 'nothing in the arm until the shot');
   m.setInput('a', { score: true });
-  run(m, 0.5);
+  m.step();
+  m.setInput('a', {}); // a quick tap: load, swing down, shoot
+  run(m, 1.5);
   assert.equal(m.score.red.ovenCarrot, 1, 'oven carrot');
+  assert.equal(r.arm, r.cfg.slap.stow, 'back up afterwards');
 });
 
 test('bots can drive the 526 robot', () => {
@@ -133,6 +137,12 @@ test('oven: intake stays up unless it has a carrot; ramp cakes caught over the b
   m.setInput('a', { sp: 'oven' });
   run(m, 6);
   assert.equal(r.held.length, 3, 'three cakes');
-  assert.equal(r.carriage, 1, 'one handed up to the arm');
-  assert.ok(Math.abs(r.arm - r.cfg.slap.oven) < 2, 'with a piece in the arm it swings down to the oven pose');
+  assert.equal(r.carriage, 0, 'all in the beltdexer: nothing in the arm unless scoring');
+  assert.equal(r.arm, r.cfg.slap.stow, 'intake stays up');
+  m.setInput('a', { sp: 'l1' });
+  run(m, 1);
+  assert.equal(r.carriage, 1, 'L1 selected: one goes up into the arm');
+  m.setInput('a', { sp: 'stow' });
+  run(m, 0.5);
+  assert.equal(r.carriage, 0, 'and back down into the beltdexer when L1 is released');
 });
