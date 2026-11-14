@@ -52,10 +52,10 @@ export const ROBOTS = {
     build: { ground: true, depot: true, ramp: true, maxLevel: 3, mech: 'claw' },
     // arm angles in degrees (0 = straight out the front, 90 = up), speed in deg/s.
     // pivot = [forward, up] of the arm pivot on the carriage (m, robot frame, elevator down);
-    // grip = where the held piece sits in the arm's own frame [along the arm, above it]
-    arm: { stow: 99, ground: -5, ramp: 90, oven: 70, pantry: 60, tongue: 45, speed: 320, tolerance: 8, pivot: [0.2985, 0.197], grip: [0.3, -0.12] },
-    // real carriage travel (m) at each sim setpoint: 21" / 33" / 48"
-    elevator: { ...base.elevator, travel: { stow: 0, oven: 0, l1: 0.533, l2: 0.838, l3: 1.219 } },
+    // grip = where the held piece sits in the arm's own frame [along the arm, above it]: tucked between the claw's two roller shafts (CAD)
+    arm: { stow: 99, ground: -5, ramp: 90, oven: 70, pantry: 60, tongue: 45, speed: 320, tolerance: 8, pivot: [0.2985, 0.197], grip: [0.3, -0.03] },
+    // carriage travel (m) at each sim setpoint (about the real 21" / 33" / 48", trimmed so the claw lines up with each shelf)
+    elevator: { ...base.elevator, travel: { stow: 0, oven: 0, l1: 0.49, l2: 0.795, l3: 1.176 } },
     trader: { x: -0.2, z: 0.33 }, // where trader carrots ride (robot frame)
     traderRate: 0.16, // s between carrots fired out of the trader
     model: { url: '/assets/robots/team/charles.glb', rig: 'charles' },
@@ -125,7 +125,7 @@ export const hasRearTrader = (mods) => mods?.mech === 'claw';
 // the build a robot actually plays with: a preset's fixed build wins, then a team lock, then the menu
 // Charles' starting load (2 preloaded carrots): both in the rear trader, one in the trader + one in the
 // claw, or two side by side in the claw (gripped only at their ends/sides)
-export const LOADS = { trader2: '2 carrots in the trader (back)', split: '1 in the trader + 1 in the claw', claw2: '2 side by side in the claw' };
+export const LOADS = { trader2: '2 carrots in the trader (back)', split: '1 in the trader + 1 in the claw', claw2: '2 end to end in the claw (left + right)' };
 export const sanitizeLoad = (l) => (LOADS[l] ? l : 'trader2');
 export const buildFor = (robot, team, mods) => sanitizeMods(ROBOTS[robot]?.build || TEAM_LOCKS[String(team ?? '')] || mods);
 // the elevator reloads from the hopper at the bottom

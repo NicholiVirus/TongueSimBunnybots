@@ -362,7 +362,7 @@ export class Match {
         r.held.push(pc.id);
         preloads[r.alliance]++;
       }
-      // Charles chooses where its two preloaded carrots start
+      // Charles chooses where its two preloaded carrots start (two in the claw sit end to end, left + right)
       const load = sanitizeLoad(slots.find((s) => s.id === r.id)?.load);
       if (hasRearTrader(r.cfg.mods) && r.held.length && load !== 'trader2') {
         r.carriagePiece = r.held[r.held.length - 1];

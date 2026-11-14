@@ -405,10 +405,9 @@ export class RobotView {
         pair.k.visible = t === 'k';
         const m = t === 'k' ? pair.k : pair.c;
         if (i < inClaw) {
-          // two carrots side by side along the arm, each gripped only at its sides
-          const a = ((st.arm ?? this.cfg.arm.stow) * Math.PI) / 180;
-          const off = inClaw === 2 ? (i === 0 ? -0.077 : 0.077) : 0;
-          m.position.set(cp.x + off * Math.cos(a), cp.z + off * Math.sin(a), 0);
+          // two carrots end to end across the claw (left + right), like the real robot
+          const off = inClaw === 2 ? (i === 0 ? -1 : 1) * (F.PIECE.length / 2 + 0.005) : 0;
+          m.position.set(cp.x, cp.z, off);
         } else m.position.set(TRADER_SLOTS[i - inClaw][0], TRADER_SLOTS[i - inClaw][1], 0);
       }
       return;
