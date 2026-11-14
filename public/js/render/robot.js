@@ -439,13 +439,18 @@ export class RobotView {
     if (this.rigKind === 'r526') {
       // the CAD has the intake upright (its stow angle); everything else is relative to that
       this.rig.intake.rotation.z = (((st.arm ?? this.cfg.slap.stow) - this.cfg.slap.stow) * Math.PI) / 180;
-      const slots = [0.12, -0.04, -0.2]; // beltdexer (forward, m); the first one feeds the intake next
+      const S = this.cfg.slap;
+      const inArm = st.flags & 8 ? 1 : 0; // the carrot held in the arm's rollers (scored next)
+      const ga = (((st.arm ?? S.stow) + S.grip[1]) * Math.PI) / 180;
+      const slots = [0.12, -0.04]; // beltdexer (forward, m); the first one is handed to the arm next
       for (let i = 0; i < this.heldMeshes.length; i++) {
         const pair = this.heldMeshes[i];
         const t = held[held.length - 1 - i];
         pair.c.visible = t === 'c';
         pair.k.visible = t === 'k';
-        (t === 'k' ? pair.k : pair.c).position.set(slots[i], 0.448 - F.PIECE.radius, 0); // up in the beltdexer
+        const m = t === 'k' ? pair.k : pair.c;
+        if (i < inArm) m.position.set(S.pivot[0] + S.grip[0] * Math.cos(ga), S.pivot[1] + S.grip[0] * Math.sin(ga) - F.PIECE.radius, 0);
+        else m.position.set(slots[Math.min(i - inArm, 1)] - (i - inArm > 1 ? 0.16 : 0), 0.52 - F.PIECE.radius, 0); // up in the beltdexer
       }
       return;
     }

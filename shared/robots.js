@@ -100,7 +100,9 @@ export const ROBOTS = {
     elevator: { ...base.elevator, speed: 3.2 }, // no elevator: these heights stand for the intake's scoring poses
     // slapdown arm angle (deg, roller direction from the front horizontal): stowed leaning back over the robot (as in the CAD), swings forward and down to
     // the carpet to intake, tipped to the shelf for LEVEL 1 or down to the oven mouth
-    slap: { stow: 110, ground: -16, feed: 35, oven: 20, l1: 61, speed: 300, tolerance: 8, feedTime: 0.2, pivot: [0.031, 0.248] },
+    // stow is also the hand-off pose where the beltdexer passes the next carrot into the arm; L1 is 15° off vertical.
+    // grip: where the arm holds its carrot, [distance from the pivot (m), angle offset from the arm (deg)] (CAD rollers)
+    slap: { stow: 120, ground: -16, feed: 35, oven: 20, l1: 75, speed: 300, tolerance: 8, feedTime: 0.2, pivot: [0.031, 0.248], grip: [0.641, -6] },
     model: { url: '/assets/robots/526/robot526.glb', rig: 'r526' },
   },
   kitbot: {
@@ -160,7 +162,7 @@ export const MECHS = { passthrough: 'Passthrough elevator', separate: 'Hopper + 
 const LOCKED_MECHS = { elevIntake: 'Ground-intake elevator + depot/ramp hopper', claw: 'Roller claw + rear trader (Charles)', gtake: 'Slapdown intake + beltdexer, scores through the intake (526)' };
 export const MECH_NAMES = { ...MECHS, ...LOCKED_MECHS };
 // one piece per lift
-export const isOneAtATime = (mods) => mods?.mech === 'separate' || mods?.mech === 'opposite' || mods?.mech === 'elevIntake' || mods?.mech === 'claw';
+export const isOneAtATime = (mods) => mods?.mech === 'separate' || mods?.mech === 'opposite' || mods?.mech === 'elevIntake' || mods?.mech === 'claw' || mods?.mech === 'gtake';
 // the elevator's end effector holds one piece itself (`carriagePiece`); the rest sit in a hopper
 export const hasGripper = (mods) => mods?.mech === 'elevIntake' || mods?.mech === 'claw';
 // the hopper is a trader on the BACK of the robot: depot carrots only, fired into the oven rear-first

@@ -104,7 +104,8 @@ A second real robot, built from its STEP export (`public/assets/robots/divebomb/
 Built from team 526's STEP export (`public/assets/robots/526/robot526.glb`). A **speedy swerve** (4.9 m/s) with a **slapdown ground intake** on the front that feeds a **beltdexer** (holds 3). It has no elevator: the beltdexer runs pieces back out **through the intake**.
 
 - **Intake:** stowed leaning back over the robot. Hold **Shift** and it swings over and slaps down in front to grab pieces.
-- **LEVEL 1:** press **1** — the intake tips to the shelf — face the pantry and press **F**.
+- **The arm holds one carrot** in its rollers. With an empty arm it swings back to the **hand-off pose**, the beltdexer passes it the next carrot, and it goes back up.
+- **LEVEL 1:** press **1** — the arm tips to 15° off vertical — face the pantry and press **F**.
 - **Oven:** press **4** — the intake swings down to the mouth — and press **F**.
 - Ground intake only, LEVEL 1 max; the build is fixed. Typing team number **526** locks any robot to this build.
 

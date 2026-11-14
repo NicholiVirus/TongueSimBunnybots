@@ -76,3 +76,28 @@ test('bots can drive the 526 robot', () => {
     assert.ok(m.score[a].totals.total >= 20, `${a} scored ${m.score[a].totals.total}`);
   }
 });
+
+test('arm holds one carrot; when empty it drops to the hand-off pose, reloads from the beltdexer, then goes back up', () => {
+  const [m, r] = solo(2);
+  const S = r.cfg.slap;
+  r.x = F.pantrySlotX(1, 1);
+  r.y = F.PANTRY.yFront - r.cfg.length / 2;
+  r.th = Math.PI / 2;
+  m.setInput('a', { sp: 'l1' });
+  run(m, 1.5);
+  assert.equal(r.carriage, 1, 'carrot in the arm');
+  assert.ok(Math.abs(r.arm - S.l1) < 2, 'L1 pose: 15 deg off vertical');
+  m.setInput('a', { sp: 'l1', score: true });
+  m.step();
+  m.setInput('a', { sp: 'l1' });
+  run(m, 0.25);
+  assert.equal(r.carriage, 0, 'arm empty after the shot');
+  assert.ok(r.arm > S.l1 + 10, 'heading back to the hand-off pose');
+  r.x += 0.5; // next gap on the shelf
+  run(m, 1.5);
+  assert.equal(r.carriage, 1, 'reloaded from the beltdexer');
+  assert.ok(Math.abs(r.arm - S.l1) < 2, 'and back up at L1');
+  m.setInput('a', { sp: 'l1', score: true });
+  run(m, 0.3);
+  assert.equal(m.score.red.pantry[0].carrot, 2);
+});

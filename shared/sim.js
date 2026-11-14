@@ -594,12 +594,26 @@ export class Match {
     const S = r.cfg.slap;
     const wantDown = r.intake; // intake held, with room, and a ground intake fitted
     const feeding = this.time < (r.slapUntil || 0);
-    // (526 scores through its intake: when not intaking it holds the pose for the chosen target, e.g. L1 / oven)
-    const rest = S[r.elevTarget] !== undefined && r.elevTarget !== 'ground' ? r.elevTarget : 'stow';
+    // (526 scores through its intake: when not intaking it holds the pose for the chosen target, e.g. L1 / oven;
+    // with an empty arm it goes back to the hand-off pose so the beltdexer can pass it the next carrot)
+    const gtake = r.cfg.mods.mech === 'gtake';
+    const reload = gtake && !r.carriage && r.held.length;
+    const rest = !reload && S[r.elevTarget] !== undefined && r.elevTarget !== 'ground' ? r.elevTarget : 'stow';
     const want = feeding ? 'feed' : wantDown ? 'ground' : rest;
     r.arm += clamp(S[want] - r.arm, -S.speed * dt, S.speed * dt);
     r.grab = wantDown && !feeding && r.arm <= S.ground + S.tolerance;
     r.intake = wantDown && !feeding; // rollers only spin while it's down
+    if (gtake) {
+      // the beltdexer hands one carrot up into the arm while it sits at the hand-off pose
+      r.carriage = Math.min(r.carriage || 0, r.held.length);
+      if (!r.carriage && r.held.length && Math.abs(r.arm - S.stow) <= S.tolerance) {
+        r.loadT = (r.loadT || 0) + dt;
+        if (r.loadT >= LOAD_TIME) {
+          r.carriage = 1;
+          r.loadT = 0;
+        }
+      } else r.loadT = 0;
+    }
   }
 
   // ask the arm for a scoring pose; true once it's there
@@ -763,7 +777,14 @@ export class Match {
       });
       if (level < 0) return this.denied(r, 'Raise the elevator to L1/L2/L3');
       if (isOneAtATime(r.cfg.mods) && !r.carriage)
-        return this.denied(r, r.cfg.mods.mech === 'claw' ? 'Claw is empty — only the claw reaches the shelves' : 'Carriage empty — stow (R) to reload from the hopper');
+        return this.denied(
+          r,
+          r.cfg.mods.mech === 'claw'
+            ? 'Claw is empty — only the claw reaches the shelves'
+            : r.cfg.mods.mech === 'gtake'
+              ? 'Arm empty — it is taking the next carrot from the beltdexer'
+              : 'Carriage empty — stow (R) to reload from the hopper',
+        );
       const shelf = this.pantry[a][level];
       const xs = this.shelfXs(a, level);
       if (shelfFit(xs, ex, a) === null) return this.denied(r, `LEVEL ${level + 1} is full`);
@@ -799,6 +820,7 @@ export class Match {
         p.level = level;
         this.emit({ type: 'score', alliance: a, pts: F.POINTS.pantry[p.type][level], label: `L${level + 1} ${p.type === 'cake' ? 'CAKE' : 'CARROT'}`, x: to.x, y: to.y, z: to.z, robot: r.id });
       });
+      if (r.cfg.mods.mech === 'gtake') r.carriage = 0; // the arm drops back to the beltdexer for the next one
       if (reloadsFromHopper(r.cfg.mods)) {
         r.carriage = 0;
         if (r.held.length && r.input.autoStow !== false) {
@@ -851,7 +873,11 @@ export class Match {
           }
         } else {
           if (!low) continue;
-          if (r.cfg.slap?.oven !== undefined && Math.abs(r.arm - r.cfg.slap.oven) > r.cfg.slap.tolerance) return false; // intake still swinging down to the mouth
+          if (r.cfg.slap?.oven !== undefined) {
+            if (!r.carriage) return this.denied(r, 'Arm empty — it is taking the next carrot from the beltdexer');
+            if (Math.abs(r.arm - r.cfg.slap.oven) > r.cfg.slap.tolerance) return false; // intake still swinging down to the mouth
+            r.carriage = 0;
+          }
           if (backElev) {
             // elevator on the back: the carrot comes out of the end effector, one per lift
             if (!r.carriage) return this.denied(r, 'End effector empty — lower the elevator (R) to load the next carrot');
