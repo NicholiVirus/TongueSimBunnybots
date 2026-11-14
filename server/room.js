@@ -125,7 +125,7 @@ export class Room {
         break;
       case 'fillBots':
         if (!isHost || this.phase !== 'lobby') return;
-        for (const s of SLOT_IDS) if (!this.slots[s]) this.slots[s] = { type: 'bot', robot: ['team', 'kitbot', 'speedy', 'tank'][SLOT_IDS.indexOf(s) % 4] };
+        for (const s of SLOT_IDS) if (!this.slots[s]) this.slots[s] = { type: 'bot', robot: ['team', 'divebomb', 'kitbot', 'speedy', 'tank'][SLOT_IDS.indexOf(s) % 5] };
         this.broadcastRoom();
         break;
       case 'kick': {

@@ -344,7 +344,7 @@ export class Match {
         w: 0,
         elev: cfg.elevator.min,
         elevTarget: 'stow',
-        arm: cfg.arm?.stow ?? 0, // claw arm angle (deg)
+        arm: cfg.arm?.stow ?? cfg.slap?.stow ?? 0, // claw arm / slapdown intake angle (deg)
         held: [],
         intake: false,
         input: { mx: 0, my: 0, rot: 0 },
@@ -541,6 +541,7 @@ export class Match {
     }
     r.grab = r.intake;
     if (r.cfg.arm) this.updateArm(r, inp, en, dt);
+    else if (r.cfg.slap) this.updateSlap(r, dt);
     if (reloadsFromHopper(mods)) {
       r.carriage = Math.min(r.carriage || 0, r.held.length);
       if (!r.carriage && r.held.length && r.elev <= e.min + 0.04) {
@@ -583,6 +584,18 @@ export class Match {
     r.arm += clamp(A[want] - r.arm, -A.speed * dt, A.speed * dt);
     // pieces are only grabbed once the claw is actually down
     r.grab = r.intake && r.arm <= A.ground + A.tolerance && r.elev <= e.min + 0.08;
+  }
+
+  // SLAPDOWN INTAKE (Divebomb): stowed up until the driver intakes, then it drops to the carpet, grabs ONE
+  // piece, lifts it to the indexer (a short feed cycle) and only then can go down again.
+  updateSlap(r, dt) {
+    const S = r.cfg.slap;
+    const wantDown = r.intake; // intake held, with room, and a ground intake fitted
+    const feeding = this.time < (r.slapUntil || 0);
+    const want = feeding ? 'feed' : wantDown ? 'ground' : 'stow';
+    r.arm += clamp(S[want] - r.arm, -S.speed * dt, S.speed * dt);
+    r.grab = wantDown && !feeding && r.arm <= S.ground + S.tolerance;
+    r.intake = wantDown && !feeding; // rollers only spin while it's down
   }
 
   // ask the arm for a scoring pose; true once it's there
@@ -1135,6 +1148,7 @@ export class Match {
     p.vx = p.vy = p.vz = p.w = 0;
     r.held.push(p.id);
     if (hasGripper(r.cfg.mods)) r.carriagePiece = p.id; // ground pickups go into the gripper
+    if (r.cfg.slap) r.slapUntil = this.time + r.cfg.slap.feedTime; // lift it to the indexer before the next grab
     if (r.held.length >= F.MAX_HELD) r.intake = false;
     this.emit({ type: 'intake', robot: r.id, piece: p.type });
   }

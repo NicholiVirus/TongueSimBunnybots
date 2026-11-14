@@ -28,6 +28,7 @@ import trimesh
 src, out = sys.argv[1], sys.argv[2]
 DEFL = float(sys.argv[3]) if len(sys.argv) > 3 else 1.5   # mm
 ANG = float(sys.argv[4]) if len(sys.argv) > 4 else 0.7     # rad
+ROBOT = sys.argv[5] if len(sys.argv) > 5 else 'charles'   # 'charles' | 'divebomb'
 MIN_DIAG = 14.0  # mm: skip tiny hardware
 
 doc = TDocStd_Document(TCollection_ExtendedString("doc"))
@@ -48,7 +49,7 @@ def color(l):
             return (c.Red(), c.Green(), c.Blue())
     return None
 
-COARSE = re.compile(r'Pulley|Belt|Kraken|MAXPlanetary|SDS MK5|Sprocket|Chain|Compliant|Flap Wheel|Encoder|Bearing Block|WCP-|PDH|MPM|Radio|Breaker|Battery|Camera|Tensioner|LaserCAN|LASER CAN|Crush Block|Dyneema|ThunderHex|Rounded Hex')
+COARSE = re.compile(r'Flex Wheel|HTD|MAXTube|Hopper|Pulley|Belt|Kraken|MAXPlanetary|SDS MK5|Sprocket|Chain|Compliant|Flap Wheel|Encoder|Bearing Block|WCP-|PDH|MPM|Radio|Breaker|Battery|Camera|Tensioner|LaserCAN|LASER CAN|Crush Block|Dyneema|ThunderHex|Rounded Hex')
 def tess(shape, nm=''):
     coarse = bool(COARSE.search(nm))
     BRepMesh_IncrementalMesh(shape, DEFL * (2.5 if coarse else 1), False, ANG * (1.7 if coarse else 1), True)
@@ -76,6 +77,32 @@ ELEV_STAGE = ['(42" L', '2" x 1" x 0.0625" Aluminum Box Tube (25" L', '1" x 1" x
               'Elevator Rope Pulley Mounting Kit', 'Inline Clamping (WCP) <3>', 'Inline Clamping (WCP)-Mirrored <3>']
 ELEV_CARR = ['(22" L', '(9" L', 'Inline Clamping (WCP) <1>', 'Inline Clamping (WCP) <2>', 'Inline Clamping (WCP)-Mirrored <1>', 'Inline Clamping (WCP)-Mirrored <2>', 'Dyneema Tensioning Cam']
 SSTI_CARR = ['Part 10', '2" x 2" x 0.0625" Aluminum Box Tube (7" L', 'Kraken X60 Brushless Motor <1>', 'MAXPlanetary (REV) <1>', 'WCP Through Bore Encoder']
+
+def classify_dive(path, nm, bb):
+    """Divebomb: groups base, bumper, carriage (end effector + its elevator frame), intake (slapdown arm)."""
+    full = path + [nm]
+    top = full[1] if len(full) > 1 else nm
+    mn, mx = bb
+    if 'End Effector' in top: return 'carriage'
+    if 'Claudes NEW Elevator' in top:
+        child = full[2] if len(full) > 2 else nm
+        if any(k in child for k in ('(17" L', 'Dyneema Tensioning', 'Inline Clamping')): return 'carriage'
+        if '(25" L' in child and mx[2] < 600: return 'carriage'
+        return 'base'
+    if "G-take" in top:
+        # the slapdown arm: everything past the pivot (y > 340 mm) plus its long side tubes
+        if mn[1] > 340 or child_is_arm_tube(nm): return 'intake'
+        return 'base'
+    if 'Bumper AS <1>' in path and nm == 'Part 6': return 'bumper'
+    if nm.startswith('Polycarb') or nm in ('Hopper Lip',): return 'glass' if nm.startswith('Polycarb') else 'base'
+    return 'base'
+
+def child_is_arm_tube(nm):
+    return nm.startswith('Tube 2"x1"x19.5')
+
+def is_carrot(bb):
+    d = sorted((bb[1] - bb[0]).tolist())
+    return 140 < d[0] < 165 and 140 < d[1] < 165 and 440 < d[2] < 470
 
 def classify(path, nm, bb):
     """path = names of ancestors (top first), nm = leaf name, bb = (min, max) in CAD mm"""
@@ -133,7 +160,10 @@ def walk(l, loc, path, inherited):
     bb = (V.min(0), V.max(0))
     if np.linalg.norm(bb[1] - bb[0]) < MIN_DIAG:
         skipped += 1; return
-    g = classify(path, nm, bb)
+    if ROBOT == 'divebomb' and is_carrot(bb):
+        skipped += 1  # the CAD includes a carrot showing how it fits in the end effector: not part of the robot
+        return
+    g = classify_dive(path, nm, bb) if ROBOT == 'divebomb' else classify(path, nm, bb)
     rgb = tuple(round(c, 3) for c in (col or (0.45, 0.45, 0.47)))
     add(g, rgb, V, F)
     stats.append((len(F), g, nm, [round(float(x), 1) for x in np.concatenate(bb)]))
@@ -141,8 +171,10 @@ def walk(l, loc, path, inherited):
 roots = Sequence_TDF_Label(); st.GetFreeShapes(roots)
 for i in range(1, roots.Length() + 1): walk(roots.Value(i), TopLoc_Location(), [], None)
 
-# CAD (mm; X left, -Y forward, Z up)  ->  three robot frame (m; X forward, Y up, Z right)
+# Charles: CAD (mm; X left, -Y forward, Z up)  ->  three robot frame (m; X forward, Y up, Z right)
 def conv(V):
+    if ROBOT == 'divebomb':  # forward = the intake side (+Y), scoring out the back
+        return np.stack([V[:, 1], V[:, 2], V[:, 0]], axis=1) / 1000.0
     return np.stack([-V[:, 1], V[:, 2], -V[:, 0]], axis=1) / 1000.0
 
 scene = trimesh.Scene()

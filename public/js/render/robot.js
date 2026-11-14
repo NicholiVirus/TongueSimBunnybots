@@ -273,7 +273,8 @@ export class RobotView {
       this.roller = null;
       this.modules = [];
       this.wheels = [];
-      if (model.rig === 'charles') this.rigCharles(cad); // (before it joins the scene: works in the robot's own frame)
+      if (model.rig === 'charles') this.rigCharles(cad);
+      if (model.rig === 'divebomb') this.rigDivebomb(cad); // (before it joins the scene: works in the robot's own frame)
       this.group.remove(this.body);
       this.body = cad;
       this.group.add(cad);
@@ -340,6 +341,30 @@ export class RobotView {
     this.tongue.material.visible = false; // on Charles the arm itself is the tongue
   }
 
+  // DIVEBOMB: base frame + hopper (indexer), the carriage (end effector + its frame) that rides the
+  // elevator, and the slapdown intake arm that pivots about the shaft at the robot's centre.
+  rigDivebomb(cad) {
+    cad.updateMatrixWorld(true);
+    const meshes = [];
+    cad.traverse((o) => o.isMesh && meshes.push(o));
+    const rig = new THREE.Group();
+    cad.add(rig);
+    const mk = (parent = rig) => {
+      const g = new THREE.Group();
+      parent.add(g);
+      return g;
+    };
+    const parts = { base: mk(), carriage: mk(), intake: mk() };
+    parts.intake.position.set(0, 0.21, 0); // slapdown pivot (CAD: y 0, z 210 mm)
+    for (const m of meshes) {
+      const tag = (m.material?.name || 'base').split('_')[0];
+      if (tag === 'bumper') m.visible = false; // the sim draws alliance-coloured bumpers
+      (parts[tag] || parts.base).attach(m);
+    }
+    this.rig = parts;
+    this.rigKind = 'divebomb';
+  }
+
   // state: {x,y,th,elev,held,flags,vx,vy,w,arm}
   update(st, dt) {
     const g = this.group;
@@ -389,6 +414,23 @@ export class RobotView {
     }
 
     const held = st.held || '';
+    if (this.rigKind === 'divebomb') {
+      const travel = elevTravel(this.cfg, st.elev);
+      this.rig.carriage.position.y = travel;
+      this.rig.intake.rotation.z = ((st.arm ?? this.cfg.slap.stow) * Math.PI) / 180;
+      // one carrot in the end effector (back), the rest wait in the indexer
+      const inEnd = st.flags & 8 ? 1 : 0;
+      for (let i = 0; i < this.heldMeshes.length; i++) {
+        const pair = this.heldMeshes[i];
+        const t = held[held.length - 1 - i];
+        pair.c.visible = t === 'c';
+        pair.k.visible = t === 'k';
+        const m = t === 'k' ? pair.k : pair.c;
+        if (i < inEnd) m.position.set(-0.316, 0.452 + travel - F.PIECE.radius, 0);
+        else m.position.set(i - inEnd ? 0.12 : 0.29, 0.49 - F.PIECE.radius, 0);
+      }
+      return;
+    }
     if (this.rig) {
       // 2-stage cascade elevator: the carriage travels twice as far as the first stage
       const travel = elevTravel(this.cfg, st.elev);

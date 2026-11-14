@@ -60,6 +60,28 @@ export const ROBOTS = {
     traderRate: 0.16, // s between carrots fired out of the trader
     model: { url: '/assets/robots/team/charles.glb', rig: 'charles' },
   },
+  divebomb: {
+    ...base,
+    id: 'divebomb',
+    name: 'Divebomb',
+    blurb:
+      'L1/L2 robot with a slapdown ground intake on the opposite side from its elevator. The intake drops to grab ONE carrot, lifts it to the indexer (holds 2), and the elevator comes back down to take the next one (1 in the end effector) before scoring out the back.',
+    length: 0.927, // bumper to bumper, intake (front) to elevator (back)
+    width: 0.952,
+    mass: 62,
+    maxSpeed: 5.12,
+    accel: 10,
+    intakeWidth: 0.76, // slapdown roller width
+    intakeReach: 0.2, // the intake sticks out past the front bumper
+    scoreCooldown: 0.3,
+    // the real build: ground intake only, L1/L2, indexer + end effector (one piece per lift)
+    build: { ground: true, depot: false, ramp: false, maxLevel: 2, mech: 'opposite' },
+    // carriage travel (m) at each setpoint, from the CAD (end effector sits at its lowest pose in the CAD)
+    elevator: { ...base.elevator, travel: { stow: 0, oven: 0, l1: 0.454, l2: 0.814 } },
+    // slapdown intake angle (deg, 0 = down on the carpet, up = raised) and timing
+    slap: { stow: 62, ground: 0, feed: 30, speed: 260, tolerance: 8, feedTime: 0.55 },
+    model: { url: '/assets/robots/divebomb/divebomb.glb', rig: 'divebomb' },
+  },
   kitbot: {
     ...base,
     id: 'kitbot',
