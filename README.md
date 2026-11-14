@@ -76,7 +76,7 @@ Auto-align (Space) also works at your **DEPOT** chutes: it parks you right under
 
 ## Team easter eggs
 
-- **Team 526** — locked build (the Mechanisms menu greys out): max **LEVEL 1**, the **elevator is the ground intake** (holds one piece and scores it on L1 or in the OVEN), and a separate **hopper fed only by the DEPOT/RAMP** that can only dump into the OVEN.
+- **Team 526** — locked to the team's real build (see *Team 526 robot*): slapdown intake + beltdexer, scores LEVEL 1 and the oven back out through the intake.
 
 ## Charles — team 611's robot
 
@@ -99,7 +99,16 @@ A second real robot, built from its STEP export (`public/assets/robots/divebomb/
 - **Depot:** with the intake stowed, line the front up under the chute and carrots drop into the beltdexer. - **Ramp:** catches and holds up to 3 carrot cakes (beltdexer 2 + end effector 1). The build is fixed in the menu. Bots can drive it.
 - Estimated from the CAD (tell me if wrong): intake feed angle, hopper carrot positions, and which intakes it has.
 
-To rebuild a model from a new STEP export: `pip install cadquery-ocp trimesh`, run `python3 tools/step_to_glb.py robot.step raw.glb 1.5 0.7 charles` (or `divebomb`), then `npx gltfpack -i raw.glb -o public/assets/robots/team/charles.glb -si 0.3 -cc -kn -km`. The script sorts parts into moving groups (elevator stage, carriage, arm, swerve wheels) by their names in the CAD tree. For a different team's CAD, see [`public/assets/robots/README.md`](public/assets/robots/README.md).
+## Team 526 robot
+
+Built from team 526's STEP export (`public/assets/robots/526/robot526.glb`). A **speedy swerve** (4.9 m/s) with a **slapdown ground intake** on the front that feeds a **beltdexer** (holds 3). It has no elevator: the beltdexer runs pieces back out **through the intake**.
+
+- **Intake:** stowed upright. Hold **Shift** and it slaps down to the carpet to grab pieces.
+- **LEVEL 1:** press **1** — the intake tips to the shelf — face the pantry and press **F**.
+- **Oven:** press **4** — the intake swings down to the mouth — and press **F**.
+- Ground intake only, LEVEL 1 max; the build is fixed. Typing team number **526** locks any robot to this build.
+
+To rebuild a model from a new STEP export: `pip install cadquery-ocp trimesh`, run `python3 tools/step_to_glb.py robot.step raw.glb 1.5 0.7 charles` (or `divebomb` / `526`), then `npx gltfpack -i raw.glb -o public/assets/robots/team/charles.glb -si 0.3 -cc -kn -km`. The script sorts parts into moving groups (elevator stage, carriage, arm, swerve wheels) by their names in the CAD tree. For a different team's CAD, see [`public/assets/robots/README.md`](public/assets/robots/README.md).
 
 ## Ranked runs and the leaderboard
 

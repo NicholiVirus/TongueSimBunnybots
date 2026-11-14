@@ -274,7 +274,8 @@ export class RobotView {
       this.modules = [];
       this.wheels = [];
       if (model.rig === 'charles') this.rigCharles(cad);
-      if (model.rig === 'divebomb') this.rigDivebomb(cad); // (before it joins the scene: works in the robot's own frame)
+      if (model.rig === 'divebomb') this.rigDivebomb(cad);
+      if (model.rig === 'r526') this.rig526(cad); // (before it joins the scene: works in the robot's own frame)
       this.group.remove(this.body);
       this.body = cad;
       this.group.add(cad);
@@ -365,6 +366,27 @@ export class RobotView {
     this.rigKind = 'divebomb';
   }
 
+  // TEAM 526: the frame + beltdexer, and the slapdown intake that pivots on its shaft behind the bumper
+  rig526(cad) {
+    cad.updateMatrixWorld(true);
+    const meshes = [];
+    cad.traverse((o) => o.isMesh && meshes.push(o));
+    const rig = new THREE.Group();
+    cad.add(rig);
+    const base = new THREE.Group();
+    const intake = new THREE.Group();
+    rig.add(base, intake);
+    const [px, pz] = this.cfg.slap.pivot;
+    intake.position.set(px, pz, 0);
+    for (const m of meshes) {
+      const tag = (m.material?.name || 'base').split('_')[0];
+      if (tag === 'bumper') m.visible = false; // the sim draws alliance-coloured bumpers
+      (tag === 'intake' ? intake : base).attach(m);
+    }
+    this.rig = { base, intake };
+    this.rigKind = 'r526';
+  }
+
   // state: {x,y,th,elev,held,flags,vx,vy,w,arm}
   update(st, dt) {
     const g = this.group;
@@ -414,6 +436,19 @@ export class RobotView {
     }
 
     const held = st.held || '';
+    if (this.rigKind === 'r526') {
+      // the CAD has the intake upright (its stow angle); everything else is relative to that
+      this.rig.intake.rotation.z = (((st.arm ?? this.cfg.slap.stow) - this.cfg.slap.stow) * Math.PI) / 180;
+      const slots = [0.12, -0.04, -0.2]; // beltdexer (forward, m); the first one feeds the intake next
+      for (let i = 0; i < this.heldMeshes.length; i++) {
+        const pair = this.heldMeshes[i];
+        const t = held[held.length - 1 - i];
+        pair.c.visible = t === 'c';
+        pair.k.visible = t === 'k';
+        (t === 'k' ? pair.k : pair.c).position.set(slots[i], 0.27 - F.PIECE.radius, 0);
+      }
+      return;
+    }
     if (this.rigKind === 'divebomb') {
       const travel = elevTravel(this.cfg, st.elev);
       this.rig.carriage.position.y = travel;

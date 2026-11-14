@@ -82,6 +82,27 @@ export const ROBOTS = {
     slap: { stow: 95, ground: 0, feed: 30, speed: 260, tolerance: 8, feedTime: 0.55 },
     model: { url: '/assets/robots/divebomb/divebomb.glb', rig: 'divebomb' },
   },
+  r526: {
+    ...base,
+    id: 'r526',
+    name: 'Team 526 robot',
+    blurb:
+      'Team 526\u2019s speedy swerve. A slapdown ground intake feeds a beltdexer (holds 3); the beltdexer runs pieces back out through the intake, raised to score LEVEL 1 or lowered to feed the OVEN.',
+    length: 0.902,
+    width: 0.914,
+    mass: 50,
+    maxSpeed: 4.9, // speedy swerve
+    accel: 11,
+    intakeWidth: 0.67,
+    intakeReach: 0.23,
+    scoreCooldown: 0.3,
+    build: { ground: true, depot: false, ramp: false, maxLevel: 1, mech: 'gtake' },
+    elevator: { ...base.elevator, speed: 3.2 }, // no elevator: these heights stand for the intake's scoring poses
+    // slapdown arm angle (deg, roller direction from horizontal): upright when stowed (as in the CAD), down to
+    // the carpet to intake, tipped to the shelf for LEVEL 1 or down to the oven mouth
+    slap: { stow: 70, ground: -16, feed: 35, oven: 20, l1: 61, speed: 300, tolerance: 8, feedTime: 0.2, pivot: [-0.031, 0.248] },
+    model: { url: '/assets/robots/526/robot526.glb', rig: 'r526' },
+  },
   kitbot: {
     ...base,
     id: 'kitbot',
@@ -136,7 +157,7 @@ export const ROBOT_IDS = Object.keys(ROBOTS);
 export const DEFAULT_MODS = { ground: true, depot: true, ramp: true, maxLevel: 3, mech: 'passthrough' };
 export const MECHS = { passthrough: 'Passthrough elevator', separate: 'Hopper + separate elevator', opposite: 'Hopper front + elevator back' };
 // mechanisms that only come from a locked build (a robot preset or a team number), not from menus
-const LOCKED_MECHS = { elevIntake: 'Ground-intake elevator + depot/ramp hopper', claw: 'Roller claw + rear trader (Charles)' };
+const LOCKED_MECHS = { elevIntake: 'Ground-intake elevator + depot/ramp hopper', claw: 'Roller claw + rear trader (Charles)', gtake: 'Slapdown intake + beltdexer, scores through the intake (526)' };
 export const MECH_NAMES = { ...MECHS, ...LOCKED_MECHS };
 // one piece per lift
 export const isOneAtATime = (mods) => mods?.mech === 'separate' || mods?.mech === 'opposite' || mods?.mech === 'elevIntake' || mods?.mech === 'claw';
@@ -155,7 +176,7 @@ export const reloadsFromHopper = (mods) => mods?.mech === 'separate' || mods?.me
 
 // TEAM 526 easter egg: locked build — L1 max, the elevator IS the ground intake (holds 1 piece and
 // scores it), and a separate hopper fed only by the DEPOT/RAMP that can only dump into the OVEN.
-export const TEAM_LOCKS = { 526: { ground: true, depot: true, ramp: true, maxLevel: 1, mech: 'elevIntake' } };
+export const TEAM_LOCKS = { 526: { ground: true, depot: false, ramp: false, maxLevel: 1, mech: 'gtake' } };
 export const effectiveMods = (team, mods) => sanitizeMods(TEAM_LOCKS[String(team ?? '')] || mods);
 // which way the robot faces the PANTRY: +1 front, -1 back
 export const shelfSide = (mods) => (mods?.mech === 'opposite' ? -1 : 1);
@@ -189,7 +210,7 @@ export function sanitizeMods(m) {
 export function modsLabel(m) {
   const md = sanitizeMods(m);
   const intakes = [md.ground && 'Ground', md.depot && 'Depot', md.ramp && 'Ramp'].filter(Boolean).join('/') || 'No intake';
-  return `${intakes} · ${md.maxLevel ? 'L' + md.maxLevel : 'Oven'} · ${{ passthrough: 'Passthrough', separate: 'Hopper+Elev', opposite: 'Hopper|Elev opposite', elevIntake: 'Intake-elevator + hopper (526)', claw: 'Claw + trader' }[md.mech]}`;
+  return `${intakes} · ${md.maxLevel ? 'L' + md.maxLevel : 'Oven'} · ${{ passthrough: 'Passthrough', separate: 'Hopper+Elev', opposite: 'Hopper|Elev opposite', elevIntake: 'Intake-elevator + hopper', claw: 'Claw + trader', gtake: 'Slapdown + beltdexer (526)' }[md.mech]}`;
 }
 
 const cfgCache = new Map();

@@ -28,7 +28,7 @@ import trimesh
 src, out = sys.argv[1], sys.argv[2]
 DEFL = float(sys.argv[3]) if len(sys.argv) > 3 else 1.5   # mm
 ANG = float(sys.argv[4]) if len(sys.argv) > 4 else 0.7     # rad
-ROBOT = sys.argv[5] if len(sys.argv) > 5 else 'charles'   # 'charles' | 'divebomb'
+ROBOT = sys.argv[5] if len(sys.argv) > 5 else 'charles'   # 'charles' | 'divebomb' | '526'
 MIN_DIAG = 14.0  # mm: skip tiny hardware
 
 doc = TDocStd_Document(TCollection_ExtendedString("doc"))
@@ -97,6 +97,15 @@ def classify_dive(path, nm, bb):
     if nm.startswith('Polycarb') or nm in ('Hopper Lip',): return 'glass' if nm.startswith('Polycarb') else 'base'
     return 'base'
 
+def classify_526(path, nm, bb):
+    """Team 526: groups base, bumper, intake (the slapdown arm, stowed upright in the CAD)."""
+    full = path + [nm]
+    top = full[1] if len(full) > 1 else nm
+    if 'Slapdown' in top:
+        return 'intake' if bb[1][2] > 300 else 'base'  # pivot shaft, motors and mounts stay on the frame
+    if 'Drivebase' in top and nm in ('Part 6', 'Part 7'): return 'bumper'
+    return 'base'
+
 def child_is_arm_tube(nm):
     return nm.startswith('Tube 2"x1"x19.5')
 
@@ -163,7 +172,7 @@ def walk(l, loc, path, inherited):
     if ROBOT == 'divebomb' and is_carrot(bb):
         skipped += 1  # the CAD includes a carrot showing how it fits in the end effector: not part of the robot
         return
-    g = classify_dive(path, nm, bb) if ROBOT == 'divebomb' else classify(path, nm, bb)
+    g = classify_dive(path, nm, bb) if ROBOT == 'divebomb' else classify_526(path, nm, bb) if ROBOT == '526' else classify(path, nm, bb)
     rgb = tuple(round(c, 3) for c in (col or (0.45, 0.45, 0.47)))
     add(g, rgb, V, F)
     stats.append((len(F), g, nm, [round(float(x), 1) for x in np.concatenate(bb)]))

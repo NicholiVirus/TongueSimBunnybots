@@ -594,7 +594,9 @@ export class Match {
     const S = r.cfg.slap;
     const wantDown = r.intake; // intake held, with room, and a ground intake fitted
     const feeding = this.time < (r.slapUntil || 0);
-    const want = feeding ? 'feed' : wantDown ? 'ground' : 'stow';
+    // (526 scores through its intake: when not intaking it holds the pose for the chosen target, e.g. L1 / oven)
+    const rest = S[r.elevTarget] !== undefined && r.elevTarget !== 'ground' ? r.elevTarget : 'stow';
+    const want = feeding ? 'feed' : wantDown ? 'ground' : rest;
     r.arm += clamp(S[want] - r.arm, -S.speed * dt, S.speed * dt);
     r.grab = wantDown && !feeding && r.arm <= S.ground + S.tolerance;
     r.intake = wantDown && !feeding; // rollers only spin while it's down
@@ -784,6 +786,7 @@ export class Match {
       } else px = shelfFit(xs, ex, a, 0.12);
       if (px === null) return this.denied(r, 'No room there — slide left/right to a gap');
       if (!this.armReady(r, 'pantry')) return false; // arm still swinging out
+      if (r.cfg.slap?.l1 !== undefined && Math.abs(r.arm - r.cfg.slap.l1) > r.cfg.slap.tolerance) return false; // intake still tipping to the shelf
       const first = hasGripper(r.cfg.mods) ? this.popHeldId(r, r.clawPair ?? r.carriagePiece) : this.popHeld(r, 'cake');
       const batch = [first];
       if (pair) batch.push(this.popHeldId(r, r.carriagePiece));
@@ -848,6 +851,7 @@ export class Match {
           }
         } else {
           if (!low) continue;
+          if (r.cfg.slap?.oven !== undefined && Math.abs(r.arm - r.cfg.slap.oven) > r.cfg.slap.tolerance) return false; // intake still swinging down to the mouth
           if (backElev) {
             // elevator on the back: the carrot comes out of the end effector, one per lift
             if (!r.carriage) return this.denied(r, 'End effector empty — lower the elevator (R) to load the next carrot');
