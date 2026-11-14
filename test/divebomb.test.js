@@ -16,7 +16,7 @@ const run = (m, s) => {
 
 test('Divebomb always plays its real build: ground intake only, L1/L2, one piece per lift', () => {
   const [m, r] = solo();
-  assert.deepEqual(r.cfg.mods, { ground: true, depot: true, ramp: false, maxLevel: 2, mech: 'opposite' });
+  assert.deepEqual(r.cfg.mods, { ground: true, depot: true, ramp: true, maxLevel: 2, mech: 'opposite' });
   m.setInput('a', { sp: 'l3' });
   run(m, 2);
   assert.notEqual(r.elevTarget, 'l3', 'no LEVEL 3');
@@ -110,4 +110,16 @@ test('depot: with the intake stowed, carrots drop into the beltdexer', () => {
   m.setInput('a', {});
   run(m, 5);
   assert.equal(r.held.length, 3, 'indexer fills (2) + end effector (1)');
+});
+
+test('catches and holds 3 carrot cakes from the ramp', () => {
+  const [m, r] = solo(0);
+  m.inv.red.rampCakes = 3;
+  r.x = F.OVEN.x0 - r.cfg.length / 2 - 0.05;
+  r.y = F.OVEN.yc;
+  r.th = 0;
+  run(m, 6);
+  assert.equal(r.held.length, 3);
+  assert.equal(m.inv.red.rampCakes, 0);
+  assert.ok(r.held.every((id) => m.pieces.find((p) => p.id === id).type === 'cake'));
 });
