@@ -407,7 +407,7 @@ export class RobotView {
         if (i < inClaw) {
           // two carrots end to end across the claw (left + right), like the real robot
           const off = inClaw === 2 ? (i === 0 ? -1 : 1) * (F.PIECE.length / 2 + 0.005) : 0;
-          m.position.set(cp.x, cp.z, off);
+          m.position.set(cp.x, cp.z - F.PIECE.radius, off); // (piece meshes are positioned by their underside)
         } else m.position.set(TRADER_SLOTS[i - inClaw][0], TRADER_SLOTS[i - inClaw][1], 0);
       }
       return;

@@ -689,7 +689,7 @@ export class Match {
       // claw robots: the piece is either in the claw or riding in the rear trader
       const lp = inClaw ? clawPose(r.cfg, r.elev, r.arm) : r.cfg.trader;
       back = lp.x;
-      z = lp.z;
+      z = inClaw ? lp.z - PIECE.radius : lp.z; // (a piece's z is its underside)
     }
     return {
       x: r.x + Math.cos(r.th) * back,

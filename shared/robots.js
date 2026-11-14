@@ -52,8 +52,8 @@ export const ROBOTS = {
     build: { ground: true, depot: true, ramp: true, maxLevel: 3, mech: 'claw' },
     // arm angles in degrees (0 = straight out the front, 90 = up), speed in deg/s.
     // pivot = [forward, up] of the arm pivot on the carriage (m, robot frame, elevator down);
-    // grip = where the held piece sits in the arm's own frame [along the arm, above it]: tucked between the claw's two roller shafts (CAD)
-    arm: { stow: 99, ground: -5, ramp: 90, oven: 70, pantry: 60, tongue: 45, speed: 320, tolerance: 8, pivot: [0.2985, 0.197], grip: [0.3, -0.03] },
+    // grip = where the held piece sits in the arm's own frame [along the arm, above it]: the centre of the claw arc between its roller shafts (CAD: arc centre 0.601, 0.178, radius 0.081 m)
+    arm: { stow: 99, ground: -5, ramp: 90, oven: 70, pantry: 60, tongue: 45, speed: 320, tolerance: 8, pivot: [0.2985, 0.197], grip: [0.304, -0.019] },
     // carriage travel (m) at each sim setpoint (about the real 21" / 33" / 48", trimmed so the claw lines up with each shelf)
     elevator: { ...base.elevator, travel: { stow: 0, oven: 0, l1: 0.49, l2: 0.795, l3: 1.176 } },
     trader: { x: -0.2, z: 0.33 }, // where trader carrots ride (robot frame)
