@@ -39,7 +39,7 @@ test('slapdown intake fills the beltdexer with 3 pieces', () => {
   assert.notEqual(r.elevTarget, 'l2', 'LEVEL 1 only');
 });
 
-test('scores LEVEL 1 through the intake and the oven out the back', () => {
+test('scores LEVEL 1 through the intake and spits carrots into the oven', () => {
   const [m, r] = solo(2);
   r.x = F.pantrySlotX(2, 1);
   r.y = F.PANTRY.yFront - r.cfg.length / 2;
@@ -53,13 +53,13 @@ test('scores LEVEL 1 through the intake and the oven out the back', () => {
   assert.equal(m.score.red.pantry[0].carrot, 1, 'L1 carrot');
   r.x = (F.OVEN.mouthX0 + F.OVEN.mouthX1) / 2;
   r.y = F.OVEN.y1 + r.cfg.length / 2 + 0.01;
-  r.th = Math.PI / 2; // back (beltdexer) toward the mouth
+  r.th = -Math.PI / 2; // beltdexer outlet (intake side) toward the mouth
   m.setInput('a', { sp: 'stow' });
   run(m, 0.5);
   const arm = r.arm;
   m.setInput('a', { score: true });
   run(m, 0.3);
-  assert.equal(m.score.red.ovenCarrot, 1, 'oven carrot spat out the back');
+  assert.equal(m.score.red.ovenCarrot, 1, 'oven carrot spat out');
   assert.equal(r.arm, arm, 'the arm does not move');
 });
 

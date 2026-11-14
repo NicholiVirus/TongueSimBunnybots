@@ -168,7 +168,7 @@ export function alignTarget(r, alliance) {
   const ob = F.ovenBox(alliance);
   const mouthX = (s * (F.OVEN.mouthX0 + F.OVEN.mouthX1)) / 2;
   // backs up to the oven: a loaded rear trader, or an elevator-on-the-back robot (it feeds the oven from its end effector)
-  const ovenBack = r.ovenRear || shelfSide(r.cfg.mods) < 0 || r.cfg.mods.mech === 'gtake';
+  const ovenBack = r.ovenRear || shelfSide(r.cfg.mods) < 0;
   const cands = [
     { kind: 'pantry', x: clamp(r.x, pb.x0 + 0.2, pb.x1 - 0.2), y: F.PANTRY.yFront - half - 0.01, th: shelfSide(r.cfg.mods) > 0 ? Math.PI / 2 : -Math.PI / 2 },
     // (a rear trader with carrots aboard backs up to the mouth instead)
@@ -853,8 +853,8 @@ export class Match {
     ];
     // side +1: the front of the robot at the mouth (claw / elevator). side -1: a rear trader backed up to it
     const backElev = !trader && shelfSide(r.cfg.mods) < 0 && reloadsFromHopper(r.cfg.mods);
-    const rearDump = r.cfg.mods.mech === 'gtake'; // 526: the beltdexer spits carrots out the back
-    for (const side of trader ? [1, -1] : backElev || rearDump ? [-1] : [1]) {
+    const rearDump = r.cfg.mods.mech === 'gtake'; // 526: the beltdexer spits carrots straight out (intake side)
+    for (const side of trader ? [1, -1] : backElev ? [-1] : [1]) {
       const [px, py] = side > 0 ? [fx, fy] : this.rearPoint(r);
       for (const f of mouths) {
         if (!(px > mx0 - 0.1 && px < mx1 + 0.1 && Math.abs(py - f.y) < 0.25)) continue;
@@ -882,7 +882,7 @@ export class Match {
             // (a carrot waiting up in the arm for L1 drops back and goes out too)
             p = this.popHeld(r, 'carrot');
             r.carriage = Math.min(r.carriage || 0, r.held.length);
-            const [bx, by] = this.rearPoint(r, -0.1);
+            const [bx, by] = this.frontPoint(r, -0.1);
             Object.assign(p, { x: bx, y: by, z: 0.35 });
             r.lastScore = this.time - r.cfg.scoreCooldown + 0.16; // fires as fast as a trader
           } else if (!low) continue;

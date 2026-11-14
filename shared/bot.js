@@ -596,7 +596,7 @@ export class Bot {
     // carrots -> OVEN through the kitchen-side mouth (a loaded rear trader backs up to it)
     const gx = s * ((F.OVEN.mouthX0 + F.OVEN.mouthX1) / 2 + 0.05);
     const gy = F.OVEN.y1 + half + 0.02;
-    const rear = (hasRearTrader(r.cfg.mods) && r.held.length > (r.carriagePiece ? 1 : 0)) || shelfSide(r.cfg.mods) < 0 || r.cfg.mods.mech === 'gtake';
+    const rear = (hasRearTrader(r.cfg.mods) && r.held.length > (r.carriagePiece ? 1 : 0)) || shelfSide(r.cfg.mods) < 0;
     return { kind: 'oven', goal: [gx, gy], stage: [gx, gy + 0.6], direct: true, heading: rear ? Math.PI / 2 : -Math.PI / 2, sp: 'oven', heldAtStart: r.held.length, since: m.time };
   }
 
