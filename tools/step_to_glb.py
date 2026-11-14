@@ -182,7 +182,7 @@ for i in range(1, roots.Length() + 1): walk(roots.Value(i), TopLoc_Location(), [
 
 # Charles: CAD (mm; X left, -Y forward, Z up)  ->  three robot frame (m; X forward, Y up, Z right)
 def conv(V):
-    if ROBOT == 'divebomb':  # forward = the intake side (+Y), scoring out the back
+    if ROBOT in ('divebomb', '526'):  # forward = the intake side (+Y)
         return np.stack([V[:, 1], V[:, 2], V[:, 0]], axis=1) / 1000.0
     return np.stack([-V[:, 1], V[:, 2], -V[:, 0]], axis=1) / 1000.0
 

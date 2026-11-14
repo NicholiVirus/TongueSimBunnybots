@@ -94,13 +94,13 @@ export const ROBOTS = {
     maxSpeed: 4.9, // speedy swerve
     accel: 11,
     intakeWidth: 0.67,
-    intakeReach: 0.23,
+    intakeReach: 0.25,
     scoreCooldown: 0.3,
     build: { ground: true, depot: false, ramp: false, maxLevel: 1, mech: 'gtake' },
     elevator: { ...base.elevator, speed: 3.2 }, // no elevator: these heights stand for the intake's scoring poses
-    // slapdown arm angle (deg, roller direction from horizontal): upright when stowed (as in the CAD), down to
+    // slapdown arm angle (deg, roller direction from the front horizontal): stowed leaning back over the robot (as in the CAD), swings forward and down to
     // the carpet to intake, tipped to the shelf for LEVEL 1 or down to the oven mouth
-    slap: { stow: 70, ground: -16, feed: 35, oven: 20, l1: 61, speed: 300, tolerance: 8, feedTime: 0.2, pivot: [-0.031, 0.248] },
+    slap: { stow: 110, ground: -16, feed: 35, oven: 20, l1: 61, speed: 300, tolerance: 8, feedTime: 0.2, pivot: [0.031, 0.248] },
     model: { url: '/assets/robots/526/robot526.glb', rig: 'r526' },
   },
   kitbot: {

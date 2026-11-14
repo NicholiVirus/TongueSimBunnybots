@@ -445,7 +445,7 @@ export class RobotView {
         const t = held[held.length - 1 - i];
         pair.c.visible = t === 'c';
         pair.k.visible = t === 'k';
-        (t === 'k' ? pair.k : pair.c).position.set(slots[i], 0.27 - F.PIECE.radius, 0);
+        (t === 'k' ? pair.k : pair.c).position.set(slots[i], 0.448 - F.PIECE.radius, 0); // up in the beltdexer
       }
       return;
     }
