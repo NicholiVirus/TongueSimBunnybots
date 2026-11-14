@@ -220,6 +220,21 @@ export const rampPick = (r, inp, alliance) => (inp.align && RAMP_PICK[inp.sp] &&
 // Starting spot: the whole robot has to be inside its own KITCHEN.
 export const inStartZone = (r) => F.polyInside(boxCorners(robotBox(r)), F.kitchenPoly(r.alliance));
 
+// Is this a legal starting pose (whole robot inside its KITCHEN, clear of the other robots)?
+export function validStartPose(cfg, alliance, pose, others = []) {
+  const r = { x: pose.x, y: pose.y, th: pose.th, cfg, alliance };
+  return inStartZone(r) && !others.some((o) => obbOverlap(robotBox(r), robotBox(o)));
+}
+
+// SETUP: put the robot exactly where the driver picked (once per placement id; illegal spots are ignored).
+export function applyPlacement(r, pl, others = []) {
+  if (!pl || r.placedId === pl.id) return false;
+  r.placedId = pl.id;
+  if (![pl.x, pl.y, pl.th].every(Number.isFinite) || !validStartPose(r.cfg, r.alliance, pl, others)) return false;
+  Object.assign(r, { x: pl.x, y: pl.y, th: pl.th, vx: 0, vy: 0, w: 0 });
+  return true;
+}
+
 // Drive during SETUP, kept inside the KITCHEN and off other robots (slides along edges).
 export function setupMove(r, inp, dt, others = []) {
   const ok = () => inStartZone(r) && !others.some((o) => obbOverlap(robotBox(r), robotBox(o)));
@@ -461,12 +476,9 @@ export class Match {
         this.setPhase('countdown');
         return;
       }
-      setupMove(
-        r,
-        r.input || {},
-        dt,
-        this.robots.filter((q) => q !== r),
-      );
+      const others = this.robots.filter((q) => q !== r);
+      applyPlacement(r, r.input?.pl, others);
+      setupMove(r, r.input || {}, dt, others);
     }
   }
 

@@ -5,6 +5,7 @@ import { Input } from './input.js';
 import { Hud, renderResults } from './hud.js';
 import { Audio } from './audio.js';
 import { Net } from './net.js';
+import { SetupPanel } from './setup.js';
 import { LocalSession, NetSession } from './session.js';
 
 const $ = (id) => document.getElementById(id);
@@ -352,6 +353,8 @@ function startLocal(opts) {
 
 function beginMatchView() {
   const s = app.session;
+  app.setupFor = null;
+  plHold = null;
   scene.setMatch(s.roster, s.you, settings.camera);
   app.rosterById = new Map(s.roster.map((r) => [r.id, r]));
   app.paused = false;
@@ -370,6 +373,8 @@ function quitToMenu() {
   app.room = null;
   scene.clearMatch();
   hud.show(false);
+  setupPanel.close();
+  app.setupFor = null;
   show('menu');
 }
 
@@ -720,6 +725,55 @@ let acc = 0;
 // busy laptop) still sends exactly 60 inputs/s online and practice runs at real speed.
 let tickClock = performance.now();
 const tickBoundary = () => tickClock - acc * 1000; // time the last sim tick covers up to
+// ------------------------------------------------------------------ pre-match setup panel
+let plId = 0;
+let plHold = null; // a placement stays on the input stream for a few ticks so a dropped packet can't lose it
+const setupPanel = new SetupPanel({
+  getInfo() {
+    const s = app.session;
+    const view = app.lastView;
+    const me = s?.you ? view?.robots.get(s.you) : null;
+    const info = s?.you ? app.rosterById?.get(s.you) : null;
+    return {
+      alliance: info?.alliance,
+      cfg: info ? getRobotConfig(info.robot, info.mods) : null,
+      view,
+      me,
+      roster: app.rosterById,
+      locked: !!ROBOTS[info?.robot]?.build || !!TEAM_LOCKS[info?.team],
+      load: settings.load,
+    };
+  },
+  place(pose) {
+    plHold = { pl: { id: ++plId, ...pose }, left: 10 };
+    const a = app.rosterById.get(app.session.you).alliance;
+    const s = a === 'red' ? 1 : -1;
+    settings.startPose = { x: pose.x * s, y: pose.y, th: s > 0 ? pose.th : Math.PI - pose.th }; // remembered in alliance view
+    saveSettings();
+  },
+  start() {
+    input.scoreHold = 6;
+  },
+  apply({ load, mods }) {
+    // a new configuration needs a new robot: restart the setup with it, keeping the chosen spot
+    settings.load = load;
+    if (!ROBOTS[settings.robot]?.build) settings.mods = mods;
+    $('in-load').value = load;
+    writeMods(settings.mods);
+    saveSettings();
+    app.keepSpot = true;
+    if (app.session.local) {
+      app.session.opts.load = load;
+      app.session.opts.mods = profile().mods;
+      app.session.reset();
+      beginMatchView();
+    } else {
+      sendHello();
+      online({ t: 'ranked', setup: true });
+    }
+  },
+});
+
 function pumpTicks() {
   const s = app.session;
   const now = performance.now();
@@ -733,6 +787,10 @@ function pumpTicks() {
   while (acc >= TICK && n++ < 30) {
     acc -= TICK;
     const inp = input.sample({ forward: scene.controlForward(), heading: me?.th ?? 0, fieldOriented: settings.fieldOriented, autoStow: settings.autoStow });
+    if (plHold) {
+      inp.pl = plHold.pl;
+      if (--plHold.left <= 0) plHold = null;
+    }
     s.tick(inp);
   }
   if (acc > TICK) acc = 0;
@@ -772,6 +830,34 @@ function frame(now) {
     view = s.view(now / 1000, (now - tickBoundary()) / (TICK * 1000));
     if (view) {
       view.rosterById = app.rosterById;
+      app.lastView = view;
+      // SETUP: show the placement panel; the remembered spot is placed automatically
+      if (view.snap.ph === 'setup' && s.you && $('pause').classList.contains('hidden')) {
+        if (app.setupFor !== s) {
+          app.setupFor = s;
+          const info = setupPanel.h.getInfo();
+          setupPanel.open(info);
+          const sp = settings.startPose;
+          if (sp && info.me) {
+            const sg = info.alliance === 'red' ? 1 : -1;
+            plHold = { pl: { id: ++plId, x: sp.x * sg, y: sp.y, th: sg > 0 ? sp.th : Math.PI - sp.th }, left: 10 };
+          }
+        }
+        setupPanel.draw();
+      } else if (app.setupFor) {
+        if (view.snap.ph !== 'setup') {
+          // the match is starting: remember wherever the robot ended up
+          const me = s.you ? view.robots.get(s.you) : null;
+          const a = s.you ? app.rosterById.get(s.you)?.alliance : null;
+          if (me && a) {
+            const sg = a === 'red' ? 1 : -1;
+            settings.startPose = { x: me.x * sg, y: me.y, th: sg > 0 ? me.th : Math.PI - me.th };
+            saveSettings();
+          }
+        }
+        if (view.snap.ph !== 'setup' || !s.you) setupPanel.close();
+        if (view.snap.ph !== 'setup') app.setupFor = null;
+      }
       handleEvents(s.drainEvents());
       const ns = $('netstat');
       ns.classList.toggle('hidden', !!s.local);

@@ -181,6 +181,41 @@
       <div id="hint" class="hint"></div>
       <canvas id="minimap" width="330" height="166"></canvas>
       <div class="netstat hidden" id="netstat"></div>
+      <aside class="setup-panel hidden" id="setup-panel">
+        <h3>Match setup</h3>
+        <button class="btn primary" id="setup-start">Start match <small>(Enter / F)</small></button>
+        <p class="muted small">Click the map (or drive) to place your robot in your KITCHEN, then pick its heading. Your spot is remembered.</p>
+        <canvas id="setup-map"></canvas>
+        <div class="setup-spots" id="setup-spots"></div>
+        <div class="setup-head">
+          <span class="muted small">Heading <b id="setup-deg-out">0°</b></span>
+          <input id="setup-deg" type="range" min="0" max="359" step="1" />
+          <div class="row">
+            <button class="btn tiny ghost" data-turn="-15">⟲ 15°</button>
+            <button class="btn tiny ghost" data-turn="15">⟳ 15°</button>
+            <button class="btn tiny ghost" data-head="pantry">Face pantry</button>
+            <button class="btn tiny ghost" data-head="oven">Face oven</button>
+            <button class="btn tiny ghost" data-head="field">Face field</button>
+            <button class="btn tiny ghost" data-head="wall">Face wall</button>
+          </div>
+        </div>
+        <details class="config" open>
+          <summary>Configuration</summary>
+          <div class="config-grid">
+            <label class="wide" id="setup-load-row">Starting load<select id="setup-load"></select></label>
+            <label class="check"><input type="checkbox" id="setup-ground" /> Ground</label>
+            <label class="check"><input type="checkbox" id="setup-depot" /> Depot</label>
+            <label class="check"><input type="checkbox" id="setup-ramp" /> Ramp</label>
+            <label>Highest shelf
+              <select id="setup-level"><option value="0">Oven only</option><option value="1">LEVEL 1</option><option value="2">LEVEL 2</option><option value="3">LEVEL 3</option></select>
+            </label>
+            <label class="wide">Mechanism<select id="setup-mech"></select></label>
+          </div>
+          <p class="muted small" id="setup-cfg-note"></p>
+          <button class="btn tiny" id="setup-apply">Apply configuration (restarts setup)</button>
+        </details>
+        <p class="acct-error" id="setup-msg"></p>
+      </aside>
       <div class="robot-status" id="robot-status">
         <div class="rs-title" id="rs-title">—</div>
         <div class="rs-held" id="rs-held"></div>

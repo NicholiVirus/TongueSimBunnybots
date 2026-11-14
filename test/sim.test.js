@@ -367,3 +367,35 @@ test('oven carrots recirculate into a cake on the ramp', () => {
   assert.equal(m.inv.red.rampCakes, 1, 'the baked cake is stored at the ramp');
   assert.equal(m.pieces.filter((p) => p.type === 'cake' && p.st !== 'table').length, 0, 'nothing rolls down without a robot waiting');
 });
+
+test('setup placement: exact spot + heading inside the kitchen, illegal spots ignored', async () => {
+  const { applyPlacement, validStartPose } = await import('../shared/sim.js');
+  const m = new Match({
+    slots: [
+      { id: 'a', alliance: 'red', station: 2, robot: 'kitbot' },
+      { id: 'b', alliance: 'red', station: 1, robot: 'kitbot', bot: true },
+    ],
+    setup: true,
+  });
+  const r = m.robots[0];
+  const other = m.robots[1];
+  const good = { id: 1, x: 7.2, y: 1.5, th: Math.PI / 2 };
+  m.setInput('a', { seq: 1, pl: good });
+  m.step();
+  assert.deepEqual([r.x, r.y, r.th], [7.2, 1.5, Math.PI / 2], 'placed exactly where asked');
+  m.setInput('a', { seq: 2, pl: { id: 2, x: 2, y: 0, th: 0 } }); // mid-field: outside the kitchen
+  m.step();
+  assert.equal(r.x, 7.2, 'illegal spots are ignored');
+  m.setInput('a', { seq: 3, pl: { id: 3, x: other.x, y: other.y, th: 0 } }); // on top of another robot
+  m.step();
+  assert.equal(r.x, 7.2, 'cannot overlap another robot');
+  assert.equal(validStartPose(r.cfg, 'red', { x: 7.2, y: 1.5, th: 1 }, [other]), true);
+  // each placement id is applied once, so driving away afterwards isn't undone
+  m.setInput('a', { seq: 4, pl: good, mx: 0, my: -1 });
+  for (let i = 0; i < 30; i++) m.step();
+  const y1 = r.y;
+  m.setInput('a', { seq: 5, pl: good, mx: 0, my: -1 });
+  for (let i = 0; i < 30; i++) m.step();
+  assert.ok(r.y < 1.5 && r.y < y1 - 0.01, 'driving continues after the placement');
+  void applyPlacement;
+});

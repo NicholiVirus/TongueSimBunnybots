@@ -403,5 +403,6 @@ function sanitizeInput(i) {
     tongue: !!i?.tg,
     sp: typeof i?.sp === 'string' ? i.sp.slice(0, 6) : null,
     autoStow: i?.as !== false,
+    pl: i?.pl && [i.pl.x, i.pl.y, i.pl.th].every(Number.isFinite) && Number.isInteger(i.pl.id) ? { id: i.pl.id, x: i.pl.x, y: i.pl.y, th: i.pl.th } : null,
   };
 }

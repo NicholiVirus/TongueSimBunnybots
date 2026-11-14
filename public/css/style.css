@@ -842,6 +842,65 @@ ol.small li {
   line-height: 1.45;
 }
 
+/* pre-match setup panel */
+.setup-panel {
+  position: absolute;
+  top: 172px;
+  right: 14px;
+  width: 290px;
+  max-height: calc(100vh - 172px - 70px);
+  overflow-y: auto;
+  z-index: 3;
+  pointer-events: auto;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-family: var(--body);
+}
+.setup-panel h3 {
+  margin: 0;
+}
+#setup-map {
+  height: 200px;
+  width: auto;
+  align-self: center;
+  border-radius: 8px;
+  cursor: crosshair;
+  touch-action: none;
+  border: 1px solid var(--line);
+}
+.setup-spots {
+  display: flex;
+  gap: 6px;
+}
+.setup-head input[type='range'] {
+  width: 100%;
+  padding: 0;
+}
+.setup-head .row {
+  gap: 4px;
+  margin-top: 4px;
+}
+.setup-panel .acct-error {
+  color: #ff8a8c;
+  min-height: 1em;
+  margin: 0;
+  font-size: 12px;
+}
+@media (max-width: 900px) {
+  .setup-panel {
+    top: auto;
+    bottom: 8px;
+    right: 8px;
+    width: min(290px, calc(100vw - 16px));
+    max-height: 60vh;
+  }
+}
+
 /* a robot with a fixed build (Charles): its mechanism list is read-only */
 details.fixed .config-grid {
   opacity: 0.55;

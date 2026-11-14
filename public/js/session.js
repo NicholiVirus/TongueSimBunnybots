@@ -2,7 +2,7 @@
 //   LocalSession — runs the shared Match in the browser (offline practice).
 //   NetSession   — talks to the server; predicts your own drivetrain, interpolates the rest.
 
-import { Match, TICK, driveStep, collideRobotStatic, assistInput, obbOverlap, rampPick, setupMove } from '/shared/sim.js';
+import { Match, TICK, driveStep, collideRobotStatic, assistInput, obbOverlap, rampPick, setupMove, applyPlacement } from '/shared/sim.js';
 import { Bot } from '/shared/bot.js';
 import { getRobotConfig, randomMods } from '/shared/robots.js';
 
@@ -93,7 +93,20 @@ class Interp {
   }
 }
 
-const toSimInput = (i) => ({ seq: i.seq, mx: i.mx, my: i.my, rot: i.rot, intake: !!i.in, score: !!i.sc, eject: !!i.ej, align: !!i.al, tongue: !!i.tg, sp: i.sp || null, autoStow: i.as !== false });
+const toSimInput = (i) => ({
+  seq: i.seq,
+  mx: i.mx,
+  my: i.my,
+  rot: i.rot,
+  intake: !!i.in,
+  score: !!i.sc,
+  eject: !!i.ej,
+  align: !!i.al,
+  tongue: !!i.tg,
+  sp: i.sp || null,
+  autoStow: i.as !== false,
+  pl: i.pl || null,
+});
 
 // ------------------------------------------------------------------ offline
 export class LocalSession {
@@ -288,6 +301,7 @@ export class NetSession {
     const si = toSimInput(inp);
     if (en === 'setup') {
       const others = (this.interp.latest?.r || []).filter((q) => q[0] !== this.you && this.cfgs.has(q[0])).map((q) => ({ x: q[1], y: q[2], th: q[3], cfg: this.cfgs.get(q[0]) }));
+      applyPlacement(r, si.pl, others);
       return setupMove(r, si, TICK, others);
     }
     // (1/2/3 while aligned at the ramp ask for cakes instead of moving the elevator)

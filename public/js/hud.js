@@ -81,7 +81,7 @@ export class Hud {
     const tl = s.ph === 'countdown' || s.ph === 'setup' ? 150 : Math.ceil(s.tl);
     this.setText('clock', `${Math.floor(tl / 60)}:${String(tl % 60).padStart(2, '0')}`);
 
-    if (s.ph === 'setup' && ctx.you && this.hintT < 1) this.hint('SETUP: drive to your starting spot (anywhere in your KITCHEN) · press ENTER or F to start');
+    if (s.ph === 'setup' && ctx.you && this.hintT < 1) this.hint('SETUP: pick your spot + heading in the panel (or drive) · press ENTER or F to start');
     if (s.ph === 'countdown') {
       const n = Math.max(1, Math.ceil(F.TIMING.countdown - s.pt));
       if (n !== this.lastCount) {

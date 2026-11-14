@@ -31,7 +31,7 @@ npm start          # http://localhost:3000
 
 Driving is field-oriented **from your camera's point of view** (driver station = like the real alliance wall).
 
-**Starting spot:** in practice (option **Pick my starting spot before the match**, on by default) and in ranked runs the match opens in **SETUP**: drive your robot anywhere inside your KITCHEN (it can't leave it or overlap another robot), then press **Enter** or **F** to start the countdown. No match time passes during setup.
+**Match setup (starting spot, heading, configuration):** in practice (option **Pick my starting spot before the match**, on by default) and in ranked runs the match opens in **SETUP**: a panel shows your KITCHEN from above. Click (or drag) to place your robot anywhere in it, pick its heading (slider, ±15°, or face the pantry / oven / field / wall), or just drive with WASD. The robot can't leave the kitchen or overlap another robot. Your spot and heading are remembered and placed automatically next time. The panel's **Configuration** section changes Charles's starting load, or the mechanisms of the other robots, and restarts setup with your spot kept. Press **Enter** / **F** (or Start) to begin the countdown. No match time passes during setup.
 
 **Pause:** Esc freezes practice and ranked runs until you resume; shared online matches keep running.
 
