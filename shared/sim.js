@@ -181,7 +181,7 @@ export function alignTarget(r, alliance) {
       kind: 'depot',
       x: c.x + c.dx * (half + 0.05),
       y: c.y + c.dy * (half + 0.05),
-      th: hasRearTrader(r.cfg.mods) ? Math.atan2(c.dy, c.dx) : Math.atan2(-c.dy, -c.dx),
+      th: hasRearTrader(r.cfg.mods) || r.cfg.depotRear ? Math.atan2(c.dy, c.dx) : Math.atan2(-c.dy, -c.dx),
     })),
   ];
   let best = null;
@@ -1357,7 +1357,8 @@ export class Match {
           (q) =>
             q.alliance === a &&
             q.held.length + this.incoming(q) < F.MAX_HELD &&
-            ((q.cfg.mods.depot && this.inCatchZone(q, c) && (!q.cfg.slap || q.arm >= q.cfg.slap.stow - 15)) || (!q.cfg.mods.depot && q.cfg.mods.ground && this.waitingForRoll(q, c))),
+            ((q.cfg.mods.depot && this.inCatchZone(q, c) && (!q.cfg.slap || q.cfg.depotRear || q.arm >= q.cfg.slap.stow - 15)) ||
+              (!q.cfg.mods.depot && q.cfg.mods.ground && this.waitingForRoll(q, c))),
         );
         if (!r) return;
         inv.depotCarrots--;

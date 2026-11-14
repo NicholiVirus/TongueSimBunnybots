@@ -96,7 +96,8 @@ export const ROBOTS = {
     intakeWidth: 0.67,
     intakeReach: 0.25,
     scoreCooldown: 0.3,
-    build: { ground: true, depot: false, ramp: false, maxLevel: 1, mech: 'gtake' },
+    build: { ground: true, depot: true, ramp: false, maxLevel: 1, mech: 'gtake' },
+    depotRear: true, // the depot drops carrots into the beltdexer from the back (opposite the intake)
     elevator: { ...base.elevator, speed: 3.2 }, // no elevator: these heights stand for the intake's scoring poses
     // slapdown arm angle (deg, roller direction from the front horizontal): stowed leaning back over the robot (as in the CAD), swings forward and down to
     // the carpet to intake, tipped to the shelf for LEVEL 1 or down to the oven mouth
@@ -179,7 +180,7 @@ export const reloadsFromHopper = (mods) => mods?.mech === 'separate' || mods?.me
 
 // TEAM 526 easter egg: locked build — L1 max, the elevator IS the ground intake (holds 1 piece and
 // scores it), and a separate hopper fed only by the DEPOT/RAMP that can only dump into the OVEN.
-export const TEAM_LOCKS = { 526: { ground: true, depot: false, ramp: false, maxLevel: 1, mech: 'gtake' } };
+export const TEAM_LOCKS = { 526: { ground: true, depot: true, ramp: false, maxLevel: 1, mech: 'gtake' } };
 export const effectiveMods = (team, mods) => sanitizeMods(TEAM_LOCKS[String(team ?? '')] || mods);
 // which way the robot faces the PANTRY: +1 front, -1 back
 export const shelfSide = (mods) => (mods?.mech === 'opposite' ? -1 : 1);

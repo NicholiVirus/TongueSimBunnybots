@@ -550,7 +550,7 @@ export class Bot {
       goal: [gx, gy],
       stage: [gx + c.dx * 0.6, gy + c.dy * 0.6],
       direct: true,
-      heading: catchIt && !r.cfg.slap ? Math.atan2(c.dy, c.dx) : Math.atan2(-c.dy, -c.dx), // (Divebomb's indexer takes depot carrots over its front)
+      heading: catchIt && (!r.cfg.slap || r.cfg.depotRear) ? Math.atan2(c.dy, c.dx) : Math.atan2(-c.dy, -c.dx), // (Divebomb's indexer takes depot carrots over its front)
       floor: !catchIt,
       since: m.time,
     };

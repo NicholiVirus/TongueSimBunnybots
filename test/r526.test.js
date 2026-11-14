@@ -16,7 +16,7 @@ const run = (m, s) => {
 
 test('team 526: real build, and the team number locks any robot to it', () => {
   const [, r] = solo(0, { mods: { maxLevel: 3, mech: 'passthrough' } });
-  assert.deepEqual(r.cfg.mods, { ground: true, depot: false, ramp: false, maxLevel: 1, mech: 'gtake' });
+  assert.deepEqual(r.cfg.mods, { ground: true, depot: true, ramp: false, maxLevel: 1, mech: 'gtake' });
   assert.equal(r.arm, r.cfg.slap.stow, 'intake starts upright');
   const m2 = new Match({ slots: [{ id: 'a', alliance: 'red', station: 1, robot: 'kitbot', team: '526', mods: { maxLevel: 3 } }] });
   assert.equal(m2.robots[0].cfg.mods.mech, 'gtake');
@@ -100,4 +100,19 @@ test('arm holds one carrot; when empty it drops to the hand-off pose, reloads fr
   m.setInput('a', { sp: 'l1', score: true });
   run(m, 0.3);
   assert.equal(m.score.red.pantry[0].carrot, 2);
+});
+
+test('depot carrots go into the beltdexer from the back, opposite the intake', () => {
+  const [m, r] = solo(0);
+  m.inv.red.depotCarrots = 5;
+  const c = F.depotChutes('red')[0];
+  r.x = c.x + c.dx * (r.cfg.length / 2 + 0.05);
+  r.y = c.y + c.dy * (r.cfg.length / 2 + 0.05);
+  r.th = Math.atan2(-c.dy, -c.dx);
+  m.setInput('a', { align: true }); // auto-align turns the back to the chute
+  run(m, 1.5);
+  assert.ok(Math.abs(Math.cos(r.th - Math.atan2(c.dy, c.dx)) - 1) < 0.01, 'back toward the chute');
+  m.setInput('a', {});
+  run(m, 5);
+  assert.equal(r.held.length, 3);
 });
