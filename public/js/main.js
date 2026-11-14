@@ -727,6 +727,73 @@ function handleEvents(events) {
   }
 }
 
+// ------------------------------------------------------------------ controller menu navigation
+// D-pad / left stick moves between the controls of the open screen, A presses, B goes back.
+const TOP_SCREENS = ['modal', 'pause', 'results', 'practice', 'lobby', 'menu'];
+function uiNav(cmd) {
+  const scr = TOP_SCREENS.map($).find((el) => !el.classList.contains('hidden'));
+  if (!scr) return;
+  if (cmd === 'back') {
+    const id = scr.id;
+    if (id === 'modal') closeModal();
+    else if (id === 'pause') resume();
+    else if (id === 'practice') show('menu');
+    else if (id === 'lobby') actions.leave();
+    else if (id === 'results') actions.quit();
+    return;
+  }
+  const els = [...scr.querySelectorAll('button, select, input, summary, [data-action]')].filter((el) => el.offsetParent !== null && !el.disabled && el.tabIndex !== -1);
+  if (!els.length) return;
+  const cur = document.activeElement;
+  let i = els.indexOf(cur);
+  if (i < 0) {
+    // nothing focused yet: start on the main button of the screen
+    (scr.querySelector('.btn.primary:not([disabled])') || els[0]).focus();
+    return;
+  }
+  if ((cmd === 'left' || cmd === 'right') && cur.tagName === 'SELECT') {
+    const d = cmd === 'right' ? 1 : -1;
+    cur.selectedIndex = (cur.selectedIndex + d + cur.options.length) % cur.options.length;
+    cur.dispatchEvent(new Event('change', { bubbles: true }));
+    return;
+  }
+  if ((cmd === 'left' || cmd === 'right') && cur.type === 'range') {
+    cur.value = String(Number(cur.value) + (cmd === 'right' ? 5 : -5));
+    cur.dispatchEvent(new Event('input', { bubbles: true }));
+    return;
+  }
+  if (cmd === 'accept') {
+    if (cur.tagName === 'SELECT') {
+      cur.selectedIndex = (cur.selectedIndex + 1) % cur.options.length;
+      cur.dispatchEvent(new Event('change', { bubbles: true }));
+    } else if (cur.tagName === 'INPUT' && cur.type !== 'checkbox' && cur.type !== 'range') cur.select?.();
+    else cur.click();
+    return;
+  }
+  i = (i + (cmd === 'down' || cmd === 'right' ? 1 : -1) + els.length) % els.length;
+  els[i].focus();
+  els[i].scrollIntoView?.({ block: 'nearest' });
+}
+// controllers are polled on their own 60 Hz timer (not the render loop) so quick taps aren't missed on slow frames
+let padClock = performance.now();
+setInterval(() => {
+  const now = performance.now();
+  input.pollPads(
+    SCREENS.some((id) => !$(id).classList.contains('hidden')),
+    Math.min(0.1, (now - padClock) / 1000),
+  );
+  padClock = now;
+  if (input.usingPad) {
+    document.body.classList.add('pad-nav');
+    input.usingPad = false;
+  }
+}, 16);
+window.addEventListener('mousemove', () => document.body.classList.remove('pad-nav'));
+window.addEventListener('gamepadconnected', (e) => {
+  status(`Controller connected: ${e.gamepad.id.slice(0, 40)}`);
+  hud.hint?.('Controller connected');
+});
+
 // ------------------------------------------------------------------ main loop
 let last = performance.now();
 let acc = 0;
@@ -759,6 +826,10 @@ function frame(now) {
   const s = app.session;
 
   for (const a of input.takeActions()) {
+    if (a.startsWith('ui:')) {
+      uiNav(a.slice(3));
+      continue;
+    }
     if (a === 'pause') {
       if (!$('modal').classList.contains('hidden')) closeModal();
       else if (!$('pause').classList.contains('hidden')) resume();
@@ -808,7 +879,7 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
-window.__hh = { app, scene, settings };
+window.__hh = { app, scene, settings, input };
 
 // deep link: /?room=ABCD
 const qp = new URLSearchParams(location.search);

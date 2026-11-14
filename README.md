@@ -27,7 +27,11 @@ npm start          # http://localhost:3000
 | Eject a piece | G | D-pad down |
 | Camera (driver station, chase, overhead, broadcast) | C | View |
 | Field / robot-oriented | V | L-stick click |
-| Mini-map / chat / pause | M / T / Esc | Menu |
+| Mini-map | M | D-pad up |
+| Tongue (team 611) | K | R-stick click |
+| Chat / pause | T / Esc | — / Menu (Start) |
+
+**Controller:** plug in any standard (Xbox-layout) gamepad and press a button. It drives the robot in a match, and it also runs every menu: D-pad or left stick to move between controls (the selected one is outlined), **A** to press a button / toggle a checkbox / cycle a dropdown (left/right also changes dropdowns and sliders), **B** to go back, **Menu** to pause or resume.
 
 Driving is field-oriented **from your camera's point of view** (driver station = like the real alliance wall).
 

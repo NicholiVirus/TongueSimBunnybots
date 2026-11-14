@@ -842,6 +842,12 @@ ol.small li {
   line-height: 1.45;
 }
 
+/* controller navigation: show which control is selected */
+body.pad-nav :focus {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
 /* starting position picker (main menu) */
 #setup-map {
   height: 210px;

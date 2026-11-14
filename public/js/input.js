@@ -1,4 +1,4 @@
-// Keyboard + gamepad -> one compact input sample per 60 Hz tick.
+// Keyboard + gamepad -> one compact input sample per 60 Hz tick (and controller menu navigation).
 
 const SP_KEYS = { Digit1: 'l1', Digit2: 'l2', Digit3: 'l3', Digit4: 'oven', KeyR: 'stow', Numpad1: 'l1', Numpad2: 'l2', Numpad3: 'l3', Numpad4: 'oven' };
 const PAD_SP = { 0: 'l1', 1: 'l2', 3: 'l3', 2: 'oven', 4: 'stow' };
@@ -50,6 +50,58 @@ export class Input {
     this.spHold = 10; // repeat for a few ticks so it survives a dropped packet
   }
 
+  // Read every connected controller once per frame. In a match the buttons drive the robot; while a menu is
+  // open they navigate it instead (D-pad / left stick to move, A to press, B to go back). Start = pause.
+  pollPads(ui, dt) {
+    const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+    const state = { lx: 0, ly: 0, rx: 0, intake: false, score: false, align: false };
+    let any = false;
+    for (const gp of pads) {
+      if (!gp || !gp.connected) continue;
+      const b = (i) => !!gp.buttons[i]?.pressed || (gp.buttons[i]?.value || 0) > 0.4;
+      const prev = this.padPrev[gp.index] || [];
+      const edge = (i) => b(i) && !prev[i];
+      const lx = dz(gp.axes[0] || 0);
+      const ly = dz(gp.axes[1] || 0);
+      const rx = dz(gp.axes[2] || 0);
+      if (Math.hypot(lx, ly) > Math.hypot(state.lx, state.ly)) {
+        state.lx = lx;
+        state.ly = ly;
+      }
+      if (Math.abs(rx) > Math.abs(state.rx)) state.rx = rx;
+      if (gp.buttons.some((_, i) => b(i)) || lx || ly || rx) any = true;
+      if (edge(9)) this.actions.push('pause');
+      if (ui) {
+        // menu navigation, with auto-repeat while a direction is held
+        const dir = b(12) || ly < -0.6 ? 'up' : b(13) || ly > 0.6 ? 'down' : b(14) || lx < -0.6 ? 'left' : b(15) || lx > 0.6 ? 'right' : null;
+        if (dir !== this.navDir) {
+          this.navDir = dir;
+          this.navT = 0.4;
+          if (dir) this.actions.push(`ui:${dir}`);
+        } else if (dir && (this.navT -= dt) <= 0) {
+          this.navT = 0.12;
+          this.actions.push(`ui:${dir}`);
+        }
+        if (edge(0)) this.actions.push('ui:accept');
+        if (edge(1)) this.actions.push('ui:back');
+      } else if (this.enabled) {
+        if (b(7)) state.intake = true;
+        if (b(5)) state.score = true;
+        if (edge(5)) this.scoreHold = 6;
+        if (b(6)) state.align = true;
+        if (edge(13)) this.ejectHold = 3;
+        if (edge(11)) this.tongueHold = 3;
+        for (const [i, sp] of Object.entries(PAD_SP)) if (edge(Number(i))) this.setSp(sp);
+        if (edge(8)) this.actions.push('camera');
+        if (edge(10)) this.actions.push('orient');
+        if (edge(12)) this.actions.push('minimap');
+      }
+      this.padPrev[gp.index] = gp.buttons.map((_, i) => b(i));
+    }
+    if (any) this.usingPad = true;
+    this.pad = ui ? null : state;
+  }
+
   takeActions() {
     const a = this.actions;
     this.actions = [];
@@ -72,32 +124,17 @@ export class Input {
       strafe /= kbd;
     }
 
-    const pads = navigator.getGamepads ? navigator.getGamepads() : [];
-    for (const gp of pads) {
-      if (!gp || !gp.connected) continue;
-      const lx = dz(gp.axes[0] || 0);
-      const ly = dz(gp.axes[1] || 0);
-      const rx = dz(gp.axes[2] || 0);
-      if (Math.hypot(lx, ly) > 0) {
-        fwd = -ly;
-        strafe = lx;
+    // controller (polled once per frame in pollPads)
+    const p = this.pad;
+    if (this.enabled && p) {
+      if (Math.hypot(p.lx, p.ly) > 0) {
+        fwd = -p.ly;
+        strafe = p.lx;
       }
-      if (rx) rot = -rx;
-      const b = (i) => !!gp.buttons[i]?.pressed || (gp.buttons[i]?.value || 0) > 0.4;
-      const prev = this.padPrev[gp.index] || [];
-      const edge = (i) => b(i) && !prev[i];
-      if (this.enabled) {
-        if (b(7)) intake = true;
-        if (b(5)) score = true;
-        if (edge(5)) this.scoreHold = 6;
-        if (b(6)) align = true;
-        if (edge(13)) this.ejectHold = 3;
-        for (const [i, sp] of Object.entries(PAD_SP)) if (edge(Number(i))) this.setSp(sp);
-        if (edge(8)) this.actions.push('camera');
-        if (edge(10)) this.actions.push('orient');
-      }
-      if (edge(9)) this.actions.push('pause');
-      this.padPrev[gp.index] = gp.buttons.map((_, i) => b(i));
+      if (p.rx) rot = -p.rx;
+      intake ||= p.intake;
+      score ||= p.score;
+      align ||= p.align;
     }
 
     let fx;
