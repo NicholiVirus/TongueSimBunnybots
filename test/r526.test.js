@@ -39,7 +39,7 @@ test('slapdown intake fills the beltdexer with 3 pieces', () => {
   assert.notEqual(r.elevTarget, 'l2', 'LEVEL 1 only');
 });
 
-test('scores LEVEL 1 and the oven back out through the intake', () => {
+test('scores LEVEL 1 through the intake and the oven out the back', () => {
   const [m, r] = solo(2);
   r.x = F.pantrySlotX(2, 1);
   r.y = F.PANTRY.yFront - r.cfg.length / 2;
@@ -53,16 +53,14 @@ test('scores LEVEL 1 and the oven back out through the intake', () => {
   assert.equal(m.score.red.pantry[0].carrot, 1, 'L1 carrot');
   r.x = (F.OVEN.mouthX0 + F.OVEN.mouthX1) / 2;
   r.y = F.OVEN.y1 + r.cfg.length / 2 + 0.01;
-  r.th = -Math.PI / 2;
-  m.setInput('a', { sp: 'oven' });
-  run(m, 1);
-  assert.equal(r.carriage, 0, 'nothing in the arm until the shot');
+  r.th = Math.PI / 2; // back (beltdexer) toward the mouth
+  m.setInput('a', { sp: 'stow' });
+  run(m, 0.5);
+  const arm = r.arm;
   m.setInput('a', { score: true });
-  m.step();
-  m.setInput('a', {}); // a quick tap: load, swing down, shoot
-  run(m, 1.5);
-  assert.equal(m.score.red.ovenCarrot, 1, 'oven carrot');
-  assert.equal(r.arm, r.cfg.slap.stow, 'back up afterwards');
+  run(m, 0.3);
+  assert.equal(m.score.red.ovenCarrot, 1, 'oven carrot spat out the back');
+  assert.equal(r.arm, arm, 'the arm does not move');
 });
 
 test('bots can drive the 526 robot', () => {

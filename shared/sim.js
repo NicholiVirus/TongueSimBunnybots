@@ -168,7 +168,7 @@ export function alignTarget(r, alliance) {
   const ob = F.ovenBox(alliance);
   const mouthX = (s * (F.OVEN.mouthX0 + F.OVEN.mouthX1)) / 2;
   // backs up to the oven: a loaded rear trader, or an elevator-on-the-back robot (it feeds the oven from its end effector)
-  const ovenBack = r.ovenRear || shelfSide(r.cfg.mods) < 0;
+  const ovenBack = r.ovenRear || shelfSide(r.cfg.mods) < 0 || r.cfg.mods.mech === 'gtake';
   const cands = [
     { kind: 'pantry', x: clamp(r.x, pb.x0 + 0.2, pb.x1 - 0.2), y: F.PANTRY.yFront - half - 0.01, th: shelfSide(r.cfg.mods) > 0 ? Math.PI / 2 : -Math.PI / 2 },
     // (a rear trader with carrots aboard backs up to the mouth instead)
@@ -564,8 +564,8 @@ export class Match {
 
     if (!en) return;
     // (a claw robot keeps trying for a moment after a quick tap, while its arm swings into place)
-    if (inp.score) r.scoreLatch = this.time + (r.cfg.slap?.oven !== undefined ? 1.5 : 0.35); // (526: load, swing down, shoot)
-    const wantScore = inp.score || ((r.cfg.arm || r.cfg.slap?.oven !== undefined) && this.time < (r.scoreLatch || 0));
+    if (inp.score) r.scoreLatch = this.time + 0.35;
+    const wantScore = inp.score || (r.cfg.arm && this.time < (r.scoreLatch || 0));
     if (wantScore && this.time - r.lastScore >= r.cfg.scoreCooldown && r.held.length && this.tryScore(r)) r.scoreLatch = 0;
     if (inp.eject && !r.prevEject && r.held.length) this.eject(r);
     r.prevEject = !!inp.eject;
@@ -599,10 +599,8 @@ export class Match {
     // with an empty arm it goes back to the hand-off pose so the beltdexer can pass it the next carrot)
     const gtake = r.cfg.mods.mech === 'gtake';
     // the arm stays up at the hand-off pose unless it has a carrot to score (then it goes to the L1 / oven pose).
-    // 526: F anywhere except L1 is an oven shot, whether or not the oven button was pressed first
-    if (gtake && r.input?.score && r.elevTarget !== 'l1') r.ovenShotUntil = this.time + 1.5;
-    const ovenShot = gtake && this.time < (r.ovenShotUntil || 0);
-    const target = ovenShot ? 'oven' : r.elevTarget;
+    // (526 never uses the arm for the oven: the beltdexer spits carrots out the back)
+    const target = gtake && r.elevTarget === 'oven' ? 'stow' : r.elevTarget;
     const rest = (!gtake || r.carriage) && S[target] !== undefined && target !== 'ground' ? target : 'stow';
     const want = feeding ? 'feed' : wantDown ? 'ground' : rest;
     r.arm += clamp(S[want] - r.arm, -S.speed * dt, S.speed * dt);
@@ -611,7 +609,7 @@ export class Match {
     if (gtake) {
       // carrots live in the beltdexer. One goes up into the arm only to score: while L1 is selected, or for an
       // oven shot (F with the oven selected). Otherwise the arm hands it back down to the beltdexer.
-      const wantLoad = r.elevTarget === 'l1' || ovenShot;
+      const wantLoad = r.elevTarget === 'l1';
       r.carriage = wantLoad ? Math.min(r.carriage || 0, r.held.length) : 0;
       if (wantLoad && !r.carriage && r.held.length && Math.abs(r.arm - S.stow) <= S.tolerance) {
         r.loadT = (r.loadT || 0) + dt;
@@ -855,7 +853,8 @@ export class Match {
     ];
     // side +1: the front of the robot at the mouth (claw / elevator). side -1: a rear trader backed up to it
     const backElev = !trader && shelfSide(r.cfg.mods) < 0 && reloadsFromHopper(r.cfg.mods);
-    for (const side of trader ? [1, -1] : backElev ? [-1] : [1]) {
+    const rearDump = r.cfg.mods.mech === 'gtake'; // 526: the beltdexer spits carrots out the back
+    for (const side of trader ? [1, -1] : backElev || rearDump ? [-1] : [1]) {
       const [px, py] = side > 0 ? [fx, fy] : this.rearPoint(r);
       for (const f of mouths) {
         if (!(px > mx0 - 0.1 && px < mx1 + 0.1 && Math.abs(py - f.y) < 0.25)) continue;
@@ -879,13 +878,15 @@ export class Match {
             r.lastScore = this.time;
           }
         } else {
-          if (!low) continue;
-          if (r.cfg.slap?.oven !== undefined) {
-            if (!r.carriage) return false; // the beltdexer is still handing a carrot up to the arm
-            if (Math.abs(r.arm - r.cfg.slap.oven) > r.cfg.slap.tolerance) return false; // intake still swinging down to the mouth
-            r.carriage = 0;
-          }
-          if (backElev) {
+          if (rearDump) {
+            // (a carrot waiting up in the arm for L1 drops back and goes out too)
+            p = this.popHeld(r, 'carrot');
+            r.carriage = Math.min(r.carriage || 0, r.held.length);
+            const [bx, by] = this.rearPoint(r, -0.1);
+            Object.assign(p, { x: bx, y: by, z: 0.35 });
+            r.lastScore = this.time - r.cfg.scoreCooldown + 0.16; // fires as fast as a trader
+          } else if (!low) continue;
+          else if (backElev) {
             // elevator on the back: the carrot comes out of the end effector, one per lift
             if (!r.carriage) return this.denied(r, 'End effector empty — lower the elevator (R) to load the next carrot');
             p = this.popHeld(r, 'carrot');
