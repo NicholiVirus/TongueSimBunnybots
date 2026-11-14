@@ -79,7 +79,7 @@ export const ROBOTS = {
     // carriage travel (m) at each setpoint, from the CAD (end effector sits at its lowest pose in the CAD)
     elevator: { ...base.elevator, travel: { stow: 0, oven: 0, l1: 0.454, l2: 0.814 } },
     // slapdown intake angle (deg, 0 = down on the carpet, up = raised) and timing
-    slap: { stow: 62, ground: 0, feed: 30, speed: 260, tolerance: 8, feedTime: 0.55 },
+    slap: { stow: 102, ground: 0, feed: 30, speed: 260, tolerance: 8, feedTime: 0.55 },
     model: { url: '/assets/robots/divebomb/divebomb.glb', rig: 'divebomb' },
   },
   kitbot: {

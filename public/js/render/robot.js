@@ -427,7 +427,14 @@ export class RobotView {
         pair.k.visible = t === 'k';
         const m = t === 'k' ? pair.k : pair.c;
         if (i < inEnd) m.position.set(-0.316, 0.452 + travel - F.PIECE.radius, 0);
-        else m.position.set(i - inEnd ? 0.12 : 0.29, 0.49 - F.PIECE.radius, 0);
+        else {
+          // indexer carrots rest on the slanted polycarb lip (rises 10° toward the intake): centre = a
+          // radius out along the slope's normal from the contact point
+          const th = (10 * Math.PI) / 180;
+          const ys = i - inEnd ? 0.2 : 0.35; // contact points along the lip (m)
+          const zs = 0.176 * ys + 0.391 + 0.005;
+          m.position.set(ys - F.PIECE.radius * Math.sin(th), zs + F.PIECE.radius * Math.cos(th) - F.PIECE.radius, 0);
+        }
       }
       return;
     }

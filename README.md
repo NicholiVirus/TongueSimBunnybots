@@ -96,7 +96,7 @@ A second real robot, built from its STEP export (`public/assets/robots/divebomb/
 - **Intake:** stowed raised before the match. Hold **Shift**: it drops to the carpet, grabs **one** piece, lifts it to the **indexer** (holds 2), then can go down again.
 - **Elevator:** the end effector holds **1**; after each score the elevator has to come back down to take the next carrot from the indexer (3 pieces total).
 - Ground intake only (no depot/ramp catching) — the build is fixed in the menu. Bots can drive it.
-- Estimated from the CAD (tell me if wrong): intake stow/feed angles, hopper carrot positions, and which intakes it has.
+- Estimated from the CAD (tell me if wrong): intake feed angle, hopper carrot positions, and which intakes it has.
 
 To rebuild a model from a new STEP export: `pip install cadquery-ocp trimesh`, run `python3 tools/step_to_glb.py robot.step raw.glb 1.5 0.7 charles` (or `divebomb`), then `npx gltfpack -i raw.glb -o public/assets/robots/team/charles.glb -si 0.3 -cc -kn -km`. The script sorts parts into moving groups (elevator stage, carriage, arm, swerve wheels) by their names in the CAD tree. For a different team's CAD, see [`public/assets/robots/README.md`](public/assets/robots/README.md).
 
