@@ -155,6 +155,11 @@ export const ROBOTS = {
 
 export const ROBOT_IDS = Object.keys(ROBOTS);
 
+// Pushing force (N): how hard a robot shoves in a robot-on-robot push = mass x drive acceleration (traction).
+// Team 709's drive base out-pushes every other robot by 10%: its drive is geared/tractioned to match.
+export const pushForce = (cfg) => cfg.mass * cfg.accel;
+ROBOTS.r709.accel = (1.1 * Math.max(...ROBOT_IDS.filter((id) => id !== 'r709').map((id) => pushForce(ROBOTS[id])))) / ROBOTS.r709.mass;
+
 // ------------------------------------------------------------------ robot configuration options
 // Every drivetrain preset can be built with different mechanisms:
 //   ground   — floor intake (also reaches the cake on the dinner table)

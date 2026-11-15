@@ -408,3 +408,29 @@ test('team 709: 30" x 30" frame (plus bumpers), 110 lb, drive base only', () => 
   for (let i = 0; i < 60 * 3; i++) m.step();
   assert.equal(r.held.length, 0, 'the depot does not feed it');
 });
+
+test('team 709 out-pushes every other robot by 10%', async () => {
+  const { ROBOTS, ROBOT_IDS, pushForce, getRobotConfig } = await import('../shared/robots.js');
+  const others = ROBOT_IDS.filter((id) => id !== 'r709').map((id) => pushForce(getRobotConfig(id)));
+  assert.ok(Math.abs(pushForce(getRobotConfig('r709')) - 1.1 * Math.max(...others)) < 1e-9);
+  void ROBOTS;
+  // head-on shoving match against each other preset: 709 drives the other robot backwards
+  for (const id of ROBOT_IDS.filter((x) => x !== 'r709')) {
+    const m = new Match({
+      slots: [
+        { id: 'a', alliance: 'red', station: 1, robot: 'r709' },
+        { id: 'b', alliance: 'red', station: 2, robot: id },
+      ],
+      preload: 0,
+    });
+    while (m.phase === 'countdown') m.step();
+    const [a, b] = m.robots;
+    Object.assign(a, { x: 3, y: 0, th: 0 });
+    Object.assign(b, { x: 3 + (a.cfg.length + b.cfg.length) / 2 + 0.01, y: 0, th: Math.PI });
+    m.setInput('a', { mx: 1, my: 0 });
+    m.setInput('b', { mx: -1, my: 0 });
+    const x0 = (a.x + b.x) / 2;
+    for (let i = 0; i < 120; i++) m.step();
+    assert.ok((a.x + b.x) / 2 > x0 + 0.1, `709 pushes ${id} back`);
+  }
+});

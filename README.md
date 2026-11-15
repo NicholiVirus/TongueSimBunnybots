@@ -105,7 +105,7 @@ A second real robot, built from its STEP export (`public/assets/robots/divebomb/
 
 ## Team 709
 
-A **30" x 30"** drive base (bumper-to-bumper about 36.7") weighing **110 lb** — **drive base only**: it can't pick up, hold or score game pieces, and starts with no preload. It can push, defend and park.
+A **30" x 30"** drive base (bumper-to-bumper about 36.7") weighing **110 lb** — **drive base only**: it can't pick up, hold or score game pieces, and starts with no preload. It can push, defend and park — and it has **10% more pushing force than the strongest other robot** (pushing force = mass × drive traction: 682 N vs 620 N for Charles and Divebomb).
 
 ## Team 526 robot
 

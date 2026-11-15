@@ -4,7 +4,7 @@
 
 import { Match, TICK, driveStep, collideRobotStatic, assistInput, obbOverlap, rampPick, setupMove, applyPlacement } from '/shared/sim.js';
 import { Bot } from '/shared/bot.js';
-import { getRobotConfig, randomMods } from '/shared/robots.js';
+import { getRobotConfig, randomMods, pushForce } from '/shared/robots.js';
 
 const lerp = (a, b, t) => a + (b - a) * t;
 const lerpAngle = (a, b, t) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * t;
@@ -326,7 +326,7 @@ export class NetSession {
       if (!oc) continue;
       const m = obbOverlap(me, { cx: e[1], cy: e[2], hx: oc.length / 2, hy: oc.width / 2, th: e[3] });
       if (!m) continue;
-      const share = oc.mass / (oc.mass + this.cfg.mass);
+      const share = pushForce(oc) / (pushForce(oc) + pushForce(this.cfg));
       r.x += m.nx * m.depth * share;
       r.y += m.ny * m.depth * share;
       me.cx = r.x;

@@ -2,7 +2,7 @@
 // (online play) and in the browser (offline practice). Fixed 60 Hz step.
 
 import * as F from './field.js';
-import { getRobotConfig, isOneAtATime, reloadsFromHopper, shelfSide, buildFor, hasGripper, hasRearTrader, clawPose, sanitizeLoad } from './robots.js';
+import { pushForce, getRobotConfig, isOneAtATime, reloadsFromHopper, shelfSide, buildFor, hasGripper, hasRearTrader, clawPose, sanitizeLoad } from './robots.js';
 
 export const TICK = 1 / 60;
 
@@ -699,8 +699,9 @@ export class Match {
           }
           const m = obbOverlap(robotBox(a), robotBox(b));
           if (!m) continue;
-          const ia = 1 / a.cfg.mass;
-          const ib = 1 / b.cfg.mass;
+          // the stronger pusher (mass x drive traction) gives way less
+          const ia = 1 / pushForce(a.cfg);
+          const ib = 1 / pushForce(b.cfg);
           const k = m.depth / (ia + ib);
           a.x += m.nx * k * ia;
           a.y += m.ny * k * ia;
