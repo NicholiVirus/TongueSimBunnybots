@@ -146,6 +146,7 @@ export class RobotView {
     tube(0.17, 0.08, 0.19, -fl / 2 + 0.16, 0.11, fw / 2 - 0.2, mat(0x101010));
     tube(0.14, 0.03, 0.11, -fl / 2 + 0.2, 0.085, -fw / 2 + 0.2, mat(0x3b3f46));
     tube(0.08, 0.02, 0.06, -fl / 2 + 0.33, 0.08, 0, mat(0xd4a017));
+    if (c.driveOnly) return; // just a drive base: no elevator, intake or hopper
 
     // elevator (2 stages + carriage)
     const e = c.elevator;

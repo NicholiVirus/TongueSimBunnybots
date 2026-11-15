@@ -390,17 +390,21 @@ test('a saved starting pose (alliance view) is used, mirrored for blue, and igno
   assert.equal(bad.x, F.startPose('red', 2).x, 'illegal pose falls back to the default spot');
 });
 
-test('team 709: 30" x 30" frame (plus bumpers), 110 lb, configurable mechanisms', async () => {
-  const { getRobotConfig } = await import('../shared/robots.js');
-  const c = getRobotConfig('r709', { mech: 'separate', maxLevel: 2 });
-  assert.ok(Math.abs(c.length - (0.762 + 0.17)) < 1e-6 && c.width === c.length);
-  assert.ok(Math.abs(c.mass - 49.9) < 0.1);
-  assert.equal(c.mods.mech, 'separate', 'mechanisms follow the menu');
-  const m = new Match({ slots: [{ id: 'a', alliance: 'red', station: 1, robot: 'r709', bot: true }] });
-  m.bots = [new Bot('a')];
-  for (let i = 0; i < 60 * 25; i++) {
-    m.bots[0].update(m, TICK);
-    m.step(TICK);
-  }
-  assert.ok(m.score.red.totals.total > 0, 'a bot can drive it');
+test('team 709: 30" x 30" frame (plus bumpers), 110 lb, drive base only', () => {
+  const m = new Match({ slots: [{ id: 'a', alliance: 'red', station: 1, robot: 'r709', mods: { mech: 'passthrough', maxLevel: 3, ground: true } }] });
+  const r = m.robots[0];
+  assert.ok(Math.abs(r.cfg.length - (0.762 + 0.17)) < 1e-6 && r.cfg.width === r.cfg.length);
+  assert.ok(Math.abs(r.cfg.mass - 49.9) < 0.1);
+  assert.equal(r.held.length, 0, 'no preload');
+  while (m.phase === 'countdown') m.step();
+  const c = m.addPiece('carrot', r.x + Math.cos(r.th) * (r.cfg.length / 2 + 0.1), r.y + Math.sin(r.th) * (r.cfg.length / 2 + 0.1), r.th + Math.PI / 2, 'floor');
+  m.setInput('a', { intake: true, sp: 'l1' });
+  for (let i = 0; i < 60; i++) m.step();
+  assert.equal(c.st, 'floor', 'cannot intake');
+  assert.equal(r.elevTarget, 'stow', 'no elevator');
+  m.inv.red.depotCarrots = 5;
+  const ch = F.depotChutes('red')[0];
+  Object.assign(r, { x: ch.x + ch.dx * (r.cfg.length / 2 + 0.05), y: ch.y + ch.dy * (r.cfg.length / 2 + 0.05) });
+  for (let i = 0; i < 60 * 3; i++) m.step();
+  assert.equal(r.held.length, 0, 'the depot does not feed it');
 });

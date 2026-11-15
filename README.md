@@ -105,7 +105,7 @@ A second real robot, built from its STEP export (`public/assets/robots/divebomb/
 
 ## Team 709
 
-A **30" x 30"** drivetrain (bumper-to-bumper about 36.7") weighing **110 lb**. Its mechanisms are configurable in the menu like the other placeholder robots until we have its CAD.
+A **30" x 30"** drive base (bumper-to-bumper about 36.7") weighing **110 lb** — **drive base only**: it can't pick up, hold or score game pieces, and starts with no preload. It can push, defend and park.
 
 ## Team 526 robot
 

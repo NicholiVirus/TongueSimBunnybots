@@ -374,7 +374,7 @@ export class Match {
       };
     }
     for (const r of this.robots) {
-      for (let i = 0; i < preload; i++) {
+      for (let i = 0; i < (r.cfg.driveOnly ? 0 : preload); i++) {
         const pc = this.addPiece('carrot', r.x, r.y, 0, 'held');
         pc.holder = r.id;
         r.held.push(pc.id);

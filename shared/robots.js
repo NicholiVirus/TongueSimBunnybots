@@ -112,10 +112,12 @@ export const ROBOTS = {
     ...base,
     id: 'r709',
     name: 'Team 709',
-    blurb: 'Team 709: 30" x 30" drivetrain, 110 lb. Mechanisms are configurable below until we have its CAD.',
+    blurb: 'Team 709: a 30" x 30", 110 lb drive base only — it can\u2019t pick up, hold or score game pieces (push, defend and park).',
     length: 30 * IN + 2 * 0.085, // 30" frame + bumpers
     width: 30 * IN + 2 * 0.085,
     mass: 110 * 0.4536, // 110 lb
+    build: { ground: false, depot: false, ramp: false, maxLevel: 0, mech: 'none' },
+    driveOnly: true, // no mechanisms at all: never holds a piece (no preload either)
   },
   kitbot: {
     ...base,
@@ -171,7 +173,12 @@ export const ROBOT_IDS = Object.keys(ROBOTS);
 export const DEFAULT_MODS = { ground: true, depot: true, ramp: true, maxLevel: 3, mech: 'passthrough' };
 export const MECHS = { passthrough: 'Passthrough elevator', separate: 'Hopper + separate elevator', opposite: 'Hopper front + elevator back' };
 // mechanisms that only come from a locked build (a robot preset or a team number), not from menus
-const LOCKED_MECHS = { elevIntake: 'Ground-intake elevator + depot/ramp hopper', claw: 'Roller claw + rear trader (Charles)', gtake: 'Slapdown intake + beltdexer, scores through the intake (526)' };
+const LOCKED_MECHS = {
+  elevIntake: 'Ground-intake elevator + depot/ramp hopper',
+  claw: 'Roller claw + rear trader (Charles)',
+  gtake: 'Slapdown intake + beltdexer, scores through the intake (526)',
+  none: 'Drive base only',
+};
 export const MECH_NAMES = { ...MECHS, ...LOCKED_MECHS };
 // one piece per lift
 export const isOneAtATime = (mods) => mods?.mech === 'separate' || mods?.mech === 'opposite' || mods?.mech === 'elevIntake' || mods?.mech === 'claw' || mods?.mech === 'gtake';
@@ -223,6 +230,7 @@ export function sanitizeMods(m) {
 
 export function modsLabel(m) {
   const md = sanitizeMods(m);
+  if (md.mech === 'none') return 'Drive base only';
   const intakes = [md.ground && 'Ground', md.depot && 'Depot', md.ramp && 'Ramp'].filter(Boolean).join('/') || 'No intake';
   return `${intakes} · ${md.maxLevel ? 'L' + md.maxLevel : 'Oven'} · ${{ passthrough: 'Passthrough', separate: 'Hopper+Elev', opposite: 'Hopper|Elev opposite', elevIntake: 'Intake-elevator + hopper', claw: 'Claw + trader', gtake: 'Slapdown + beltdexer (526)' }[md.mech]}`;
 }
