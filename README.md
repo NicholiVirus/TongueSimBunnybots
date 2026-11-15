@@ -107,6 +107,8 @@ A second real robot, built from its STEP export (`public/assets/robots/divebomb/
 
 A **30" x 30"** drive base (bumper-to-bumper about 36.7") weighing **110 lb** — **drive base only**: it can't pick up, hold or score game pieces, and starts with no preload. It can push, defend and park — and it has **10% more pushing force than the strongest other robot** (pushing force = mass × drive traction: 682 N vs 620 N for Charles and Divebomb).
 
+**As a bot, 709 plays defence** during TELEOP: it shoves the opposing scorer carrying the most pieces (closest first) around the open field. It leaves an opposing 709 alone unless that 709 is defending one of its own alliance's scorers (counter-defence). It never chases a robot into its KITCHEN, FARM or TABLE ZONE, just taxis in AUTO, and goes to park at ENDGAME.
+
 ## Team 526 robot
 
 Built from team 526's STEP export (`public/assets/robots/526/robot526.glb`). A **speedy swerve** (4.9 m/s) with a **slapdown ground intake** on the front that feeds a **beltdexer** (holds 3). It has no elevator: the beltdexer runs pieces back out **through the intake**.

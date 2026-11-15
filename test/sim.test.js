@@ -434,3 +434,27 @@ test('team 709 out-pushes every other robot by 10%', async () => {
     assert.ok((a.x + b.x) / 2 > x0 + 0.1, `709 pushes ${id} back`);
   }
 });
+
+test('team 709 bots play defence on opposing scorers, and only counter-defend an opposing 709', () => {
+  const slots = [
+    { id: 'red1', alliance: 'red', station: 1, robot: 'r709', bot: true },
+    { id: 'red2', alliance: 'red', station: 2, robot: 'team', bot: true },
+    { id: 'blue1', alliance: 'blue', station: 1, robot: 'r709', bot: true },
+    { id: 'blue2', alliance: 'blue', station: 2, robot: 'team', bot: true },
+  ];
+  const m = new Match({ slots });
+  while (m.phase !== 'teleop') m.step();
+  const [d, ally, opp709, scorer] = m.robots;
+  const bot = new Bot('red1');
+  const place = (r, x, y) => Object.assign(r, { x, y });
+  place(d, 1.5, 2.5);
+  place(ally, 3.5, -3.0);
+  place(opp709, -1.5, 2.5); // closer to us than the scorer, but a drive base
+  place(scorer, -2.0, -0.5);
+  assert.equal(bot.defenseTask(m, d).target, 'blue2', 'defends the scorer, not the opposing 709');
+  place(opp709, 3.2, -2.2); // now harassing our scorer
+  assert.equal(bot.defenseTask(m, d).target, 'blue1', 'counter-defence on the opposing 709');
+  place(opp709, -1.5, 2.5);
+  place(scorer, -7.0, 1.0); // safe in its own kitchen
+  assert.notEqual(bot.defenseTask(m, d).kind, 'defend', 'never chases a robot into its protected zone');
+});

@@ -218,6 +218,15 @@ export class Bot {
     }
     const t = this.task;
     if (!t) return m.setInput(this.id, inp);
+    if (t.kind === 'defend') {
+      // follow the robot being defended; give up once it reaches a protected zone
+      const o = m.robotById(t.target);
+      if (!o || protectedZone(o)) t.done = true;
+      else {
+        t.goal = [o.x, o.y];
+        t.direct = Math.hypot(o.x - r.x, o.y - r.y) < 1.6; // close: drive straight at it
+      }
+    }
 
     const rad = Math.max(r.cfg.length, r.cfg.width) / 2 + 0.06;
     // stage point (planned) then final approach (direct)
@@ -231,7 +240,7 @@ export class Bot {
       finalLeg = true;
     }
     if (!finalLeg || !t.direct) {
-      if (m.time >= this.replanAt || !this.path || this.pathGoal !== target) {
+      if (m.time >= this.replanAt || !this.path || (this.pathGoal !== target && t.kind !== 'defend')) {
         this.path = planPath(r.x, r.y, target[0], target[1], rad, r.alliance);
         this.pathGoal = target;
         this.replanAt = m.time + 0.6;
@@ -246,14 +255,14 @@ export class Bot {
     const d = Math.hypot(dx, dy);
     const remaining = Math.hypot(target[0] - r.x, target[1] - r.y) + (finalLeg ? 0 : Math.hypot(t.goal[0] - target[0], t.goal[1] - target[1]));
     const vmax = r.cfg.maxSpeed * this.skill;
-    const speed = Math.min(vmax, Math.sqrt(2 * r.cfg.accel * 0.6 * Math.max(remaining - 0.02, 0)) + (finalLeg ? 0.05 : 0.6));
+    const speed = t.kind === 'defend' ? vmax : Math.min(vmax, Math.sqrt(2 * r.cfg.accel * 0.6 * Math.max(remaining - 0.02, 0)) + (finalLeg ? 0.05 : 0.6));
     if (d > 1e-3) {
       dx /= d;
       dy /= d;
     }
     // avoid other robots — and give opponents a wide berth in ENDGAME (G11/G12 fouls)
     for (const o of m.robots) {
-      if (o === r) continue;
+      if (o === r || (t.kind === 'defend' && o.id === t.target)) continue; // (a defender drives into its target)
       const ox = r.x - o.x;
       const oy = r.y - o.y;
       const od = Math.hypot(ox, oy);
@@ -275,7 +284,8 @@ export class Bot {
 
     // unstick
     const moving = Math.hypot(r.vx, r.vy) > 0.25;
-    if (!moving && remaining > 0.4 && Math.hypot(inp.mx, inp.my) > 0.3) this.stuckT += dt;
+    if (!moving && remaining > 0.4 && Math.hypot(inp.mx, inp.my) > 0.3 && t.kind !== 'defend')
+      this.stuckT += dt; // (pushing isn't being stuck)
     else this.stuckT = Math.max(0, this.stuckT - dt * 2);
     if (this.stuckT > 1.2) {
       this.backupT = 0.6;
@@ -385,6 +395,8 @@ export class Bot {
     const parkSpot = this.parkSpot(r);
     const parkDist = Math.hypot(parkSpot.goal[0] - r.x, parkSpot.goal[1] - r.y);
     if (m.phase === 'teleop' && m.timeLeft < parkDist / (r.cfg.maxSpeed * 0.5) + 7) return parkSpot;
+    // a drive base with no mechanisms (team 709) plays defence instead
+    if (r.cfg.driveOnly) return this.defenseTask(m, r);
 
     const heldTypes = r.held.map((id) => m.pieces.find((p) => p.id === id)?.type);
     // gripper robots (claw / 526) pick ONE piece off the floor; the rest of their room is a depot hopper
@@ -487,6 +499,28 @@ export class Bot {
     const anyRamp = r.held.length === 0 ? this.rampTask(m, r, true) : null;
     if (anyRamp) return anyRamp;
     return { kind: 'idle', goal: [s * 3.2, 0.5 * (r.station - 2)], since: m.time };
+  }
+
+  // DEFENCE (drive-base robots): shove an opposing scorer around in the open field. Opposing drive bases are
+  // left alone — unless one is defending one of our scorers, then it gets counter-defended. Never chases a
+  // robot into its own KITCHEN / FARM / TABLE ZONE (G11 / G12), and doesn't cross the centre line in AUTO (G13).
+  defenseTask(m, r) {
+    const s = F.sideSign(r.alliance);
+    if (m.phase !== 'teleop') return { kind: 'idle', goal: [s * 3.2, 0.5 * (r.station - 2)], since: m.time }; // AUTO: just taxi
+    if (m.isEndgame) return { ...this.parkSpot(r), kind: 'park', since: m.time }; // ENDGAME: no shoving near the table (G12), go park
+    const opp = m.robots.filter((o) => o.alliance !== r.alliance);
+    const safe = (o) => !protectedZone(o) && !nearZone(o.x, o.y, [F.kitchenPoly(o.alliance), F.farmPoly(o.alliance)], 0.5);
+    const allies = m.robots.filter((o) => o.alliance === r.alliance && o !== r && !o.cfg.driveOnly);
+    // counter-defence: an opposing drive base that is harassing one of our scorers
+    let target = opp.find((o) => o.cfg.driveOnly && safe(o) && allies.some((a) => Math.hypot(a.x - o.x, a.y - o.y) < 1.6));
+    if (!target) {
+      const d = (o) => Math.hypot(o.x - r.x, o.y - r.y);
+      // otherwise the opposing scorer carrying the most pieces (closest first among equals)
+      target = opp.filter((o) => !o.cfg.driveOnly && safe(o)).sort((a, b) => b.held.length - a.held.length || d(a) - d(b))[0];
+    }
+    // nobody to defend right now: wait in the open field on the opponent's side of the table
+    if (!target) return { kind: 'idle', goal: [-s * 3.0, 0.6 * (r.station - 2)], since: m.time };
+    return { kind: 'defend', target: target.id, goal: [target.x, target.y], since: m.time };
   }
 
   // Only chase a cake if there's a free shelf slot and time to get it there before ENDGAME parking.
