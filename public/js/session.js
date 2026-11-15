@@ -236,7 +236,7 @@ export class NetSession {
     if (msg.ev?.length) this.events.push(...msg.ev);
     const localTk = (performance.now() / 1000) * 60;
     const off = s.tk - localTk;
-    // first snapshot, or the server clock jumped (e.g. a ranked run was paused): resync at once
+    // first snapshot, or the server clock jumped: resync at once
     if (this.clock === null || Math.abs(off - this.clock) > 30) this.clock = off;
     else {
       const dev = off - this.clock;

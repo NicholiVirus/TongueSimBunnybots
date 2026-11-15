@@ -40,13 +40,6 @@ scene.setQuality(settings.quality);
 audio.enabled = settings.sound;
 hud.showMinimap = settings.minimap;
 
-let adminKey = null; // leaderboard admin key (remembered on this device)
-try {
-  adminKey = localStorage.getItem('hh-admin-key');
-} catch {
-  /* storage unavailable */
-}
-
 const app = {
   paused: false,
   session: null,
@@ -58,7 +51,6 @@ const app = {
 // ------------------------------------------------------------------ screens
 function show(screen) {
   for (const s of SCREENS) $(s).classList.toggle('hidden', s !== screen);
-  if (screen === 'menu') refreshMenuBoard();
 }
 function inMatch() {
   return !!app.session;
@@ -187,14 +179,6 @@ const actions = {
       bots: structuredClone(practiceBots),
     });
   },
-  ranked: () => {
-    if (!$('in-name').value.trim()) {
-      $('in-name').focus();
-      return status('Type your driver name first — ranked runs are saved under it');
-    }
-    online({ t: 'ranked' });
-  },
-  leaderboard: () => openLeaderboard(),
   quick: () => online({ t: 'quick' }),
   create: () => online({ t: 'create', isPublic: true }),
   'create-private': () => online({ t: 'create', isPublic: false }),
@@ -209,7 +193,6 @@ const actions = {
   'close-modal': () => closeModal(),
   resume: () => resume(),
   restart: () => {
-    if (app.room?.ranked) return online({ t: 'ranked' });
     if (app.session?.local) {
       app.session.reset();
       beginMatchView();
@@ -218,7 +201,6 @@ const actions = {
   },
   quit: () => quitToMenu(),
   again: () => {
-    if (app.room?.ranked) return online({ t: 'ranked' });
     if (app.session?.local) {
       app.session.reset();
       beginMatchView();
@@ -389,16 +371,14 @@ function quitToMenu() {
 
 function pause() {
   if (!inMatch()) return;
-  // practice and ranked solo runs freeze until you resume; shared online matches can't
-  const solo = app.session.local || app.room?.ranked;
+  // practice freezes until you resume; shared online matches can't
+  const solo = app.session.local;
   app.paused = !!solo;
-  if (app.room?.ranked) net.send({ t: 'pause', on: true });
   $('pause-note').textContent = solo ? 'Paused — the match clock is frozen until you resume.' : 'Online match keeps running while this menu is open.';
   show('pause');
   input.enabled = false;
 }
 function resume() {
-  if (app.paused && app.room?.ranked) net.send({ t: 'pause', on: false });
   app.paused = false;
   tickClock = performance.now(); // don't replay the paused time
   acc = 0;
@@ -425,7 +405,6 @@ net.on('room', ({ room }) => {
   app.room = room;
   document.body.classList.toggle('is-host', room.host === net.id);
   renderLobby(room);
-  if (room.ranked) return; // solo ranked runs go straight into the match, no lobby
   if (!inMatch() && (room.phase === 'lobby' || room.phase === 'results')) {
     const onModal = !$('modal').classList.contains('hidden');
     if (!onModal) show('lobby');
@@ -443,17 +422,6 @@ net.on('results', (msg) => {
   setTimeout(() => showResults(msg), 1200);
 });
 net.on('lobby', () => toLobby());
-net.on('ranked', (msg) => {
-  const box = $('res-ranked');
-  const where = `<span class="small">#${msg.overallRank} overall · #${msg.rank} on ${esc(msg.archName)}</span>`;
-  box.innerHTML = !msg.improved
-    ? `<b>Ranked run: ${msg.score}</b> — your entry with this robot stays at ${msg.best}<br />${where}`
-    : msg.overallRank === 1
-      ? `🏆 <b>NEW GLOBAL RECORD: ${msg.score}</b><br />${where}`
-      : `<b>Ranked run saved: ${msg.score}</b><br />${where}`;
-  box.classList.remove('hidden');
-  menuBoardAt = 0;
-});
 net.on('chat', ({ from, text }) => addChat(from, text));
 net.on('error', ({ msg }) => {
   status(msg);
@@ -568,120 +536,18 @@ function showResults(res) {
   if (app.resultsShown) return;
   app.resultsShown = true;
   renderResults(res, app.session?.roster);
-  if (!app.room?.ranked) $('res-ranked').classList.add('hidden');
   $('res-banner').scrollIntoView?.();
   show('results');
   input.enabled = false;
   const againBtn = document.querySelector('#results [data-action="again"]');
   const local = app.session?.local;
-  againBtn.textContent = local || app.room?.ranked ? 'Play Again' : app.room?.host === net.id ? 'Back to Lobby' : 'Lobby';
+  againBtn.textContent = local ? 'Play Again' : app.room?.host === net.id ? 'Back to Lobby' : 'Lobby';
 }
 
-// ------------------------------------------------------------------ leaderboard
-async function apiCall(path, { method = 'GET', body } = {}) {
-  const headers = { 'content-type': 'application/json' };
-  if (adminKey) headers['x-admin-key'] = adminKey;
-  const res = await fetch(`/api${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw Object.assign(new Error(data.error || `Server error (${res.status})`), { status: res.status });
-  return data;
-}
-
+// ------------------------------------------------------------------ profile -> server
 function sendHello() {
   net.send({ t: 'hello', ...profile() });
 }
-
-function setAdminKey(k) {
-  adminKey = k;
-  try {
-    if (k) localStorage.setItem('hh-admin-key', k);
-    else localStorage.removeItem('hh-admin-key');
-  } catch {
-    /* storage unavailable */
-  }
-}
-
-function openLeaderboard() {
-  openModal('tpl-leaderboard');
-  $('lb-tabs').addEventListener('click', (e) => e.target.dataset.board && loadBoard(e.target.dataset.board));
-  $('lb-table').addEventListener('click', async (e) => {
-    const b = e.target.closest('[data-remove]');
-    if (!b || !confirm(`Remove ${b.dataset.name}'s ${b.dataset.score} from the leaderboard?`)) return;
-    try {
-      await apiCall('/leaderboard', { method: 'DELETE', body: { id: b.dataset.remove } });
-    } catch (err) {
-      alert(err.message);
-    }
-    loadBoard($('lb-tabs').querySelector('.on')?.dataset.board || 'overall');
-  });
-  $('lb-admin').textContent = adminKey ? 'Admin ✓ (sign out)' : 'Admin';
-  $('lb-admin').addEventListener('click', async () => {
-    if (adminKey) setAdminKey(null);
-    else {
-      const k = prompt('Leaderboard admin key');
-      if (!k) return;
-      setAdminKey(k);
-      try {
-        await apiCall('/admin', { method: 'POST' });
-      } catch (err) {
-        setAdminKey(null);
-        alert(err.message);
-      }
-    }
-    $('lb-admin').textContent = adminKey ? 'Admin ✓ (sign out)' : 'Admin';
-    loadBoard($('lb-tabs').querySelector('.on')?.dataset.board || 'overall');
-  });
-  loadBoard('overall');
-}
-
-async function loadBoard(board) {
-  const table = $('lb-table');
-  if (!table) return;
-  table.innerHTML = '<tr><td class="muted">Loading…</td></tr>';
-  let d;
-  try {
-    d = await apiCall(`/leaderboard?board=${encodeURIComponent(board)}`);
-  } catch (err) {
-    table.innerHTML = `<tr><td class="muted">${esc(err.message)} — the leaderboard needs the online server.</td></tr>`;
-    return;
-  }
-  $('lb-tabs').innerHTML = Object.entries(d.boards)
-    .map(([k, t]) => `<button class="tab ${k === d.board ? 'on' : ''}" data-board="${k}">${esc(t)}</button>`)
-    .join('');
-  const admin = !!adminKey;
-  const head = `<tr><th>#</th><th>Driver</th><th>Team</th><th>Score</th><th>Robot</th><th>Date</th>${admin ? '<th></th>' : ''}</tr>`;
-  const rows = d.rows.map(
-    (r) =>
-      `<tr><td>${r.rank}</td><td>${esc(r.name)}</td><td>${r.team ? '#' + esc(r.team) : '—'}</td><td class="score">${r.score}</td>` +
-      `<td>${esc(r.robot)}<div class="build">${esc(r.build)}</div></td><td class="small">${new Date(r.date).toLocaleDateString()}</td>` +
-      (admin ? `<td><button class="btn tiny ghost" data-remove="${esc(r.id)}" data-name="${esc(r.name)}" data-score="${r.score}" title="Remove this score">✕</button></td>` : '') +
-      '</tr>',
-  );
-  table.innerHTML = head + (rows.join('') || `<tr><td colspan="7" class="muted">No ranked runs here yet — be the first!</td></tr>`);
-}
-
-// top 10 of the overall board, shown on the main menu to everyone (guests included)
-let menuBoardAt = 0;
-async function refreshMenuBoard(force = false) {
-  if (!force && Date.now() - menuBoardAt < 15000) return;
-  menuBoardAt = Date.now();
-  const table = $('mb-table');
-  try {
-    const d = await apiCall('/leaderboard?board=overall');
-    table.innerHTML =
-      d.rows
-        .slice(0, 10)
-        .map(
-          (r) =>
-            `<tr><td>${r.rank}</td><td>${esc(r.name)}${r.team ? ` <span class="muted small">#${esc(r.team)}</span>` : ''}<div class="build">${esc(r.build)}</div></td><td class="score">${r.score}</td></tr>`,
-        )
-        .join('') || '<tr><td class="muted">No ranked runs yet — play a 🏆 Ranked Run to claim #1!</td></tr>';
-  } catch {
-    menuBoardAt = 0;
-    table.innerHTML = '<tr><td class="muted">Leaderboard unavailable offline.</td></tr>';
-  }
-}
-refreshMenuBoard();
 
 // ------------------------------------------------------------------ events -> HUD/audio
 function handleEvents(events) {

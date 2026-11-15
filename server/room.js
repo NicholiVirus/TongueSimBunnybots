@@ -15,12 +15,10 @@ const clean = (s, n) =>
     .slice(0, n);
 
 export class Room {
-  constructor(code, { isPublic = true, ranked = false, onEmpty, onResult } = {}) {
+  constructor(code, { isPublic = true, onEmpty } = {}) {
     this.code = code;
     this.isPublic = isPublic;
-    this.ranked = ranked; // solo leaderboard run: nobody else joins, nothing can be changed
     this.onEmpty = onEmpty;
-    this.onResult = onResult;
     this.players = new Map(); // id -> player
     this.host = null;
     this.slots = Object.fromEntries(SLOT_IDS.map((s) => [s, null]));
@@ -87,7 +85,6 @@ export class Room {
 
   handle(player, msg) {
     const isHost = player.id === this.host;
-    if (this.ranked && msg.t !== 'in' && msg.t !== 'pause') return;
     switch (msg.t) {
       case 'slot': {
         if (this.phase !== 'lobby') return;
@@ -148,10 +145,6 @@ export class Room {
         if (text) this.sendChat(player, text);
         break;
       }
-      case 'pause':
-        // only a ranked solo run can be frozen (nobody else is playing in it)
-        if (this.ranked && this.phase === 'match') this.setPaused(!!msg.on);
-        break;
       case 'in':
         if (this.phase === 'match' && Array.isArray(msg.i)) {
           for (const inp of msg.i.slice(0, 8)) player.queue.push(sanitizeInput(inp));
@@ -228,29 +221,15 @@ export class Room {
     return out;
   }
 
-  setPaused(on) {
-    if (on === !!this.paused) return;
-    this.paused = on;
-    if (!on) {
-      for (const p of this.players.values()) {
-        p.queue = []; // inputs sent while paused are stale
-        p.owed = 0;
-        p.filling = true;
-      }
-    }
-  }
-
   run() {
     this.stop();
-    this.paused = false;
     let last = performance.now();
     let acc = 0;
     let sinceSnap = 0;
     this.delta = null;
     this.loop = setInterval(() => {
       const now = performance.now();
-      if (this.paused) acc = 0;
-      else acc += Math.min(0.25, (now - last) / 1000);
+      acc += Math.min(0.25, (now - last) / 1000);
       last = now;
       while (acc >= TICK && this.match) {
         acc -= TICK;
@@ -318,7 +297,6 @@ export class Room {
     this.lastResult = { result: m.result, score: m.score, roster: m.roster(), fouls: m.fouls };
     this.broadcast({ t: 'results', ...this.lastResult });
     this.broadcastRoom();
-    this.onResult?.(this, m);
   }
 
   tick() {
@@ -368,7 +346,6 @@ export class Room {
       phase: this.phase,
       settings: this.settings,
       isPublic: this.isPublic,
-      ranked: this.ranked,
       slots,
       spectators: [...this.players.values()].filter((p) => !seated.has(p.id)).map((p) => ({ pid: p.id, name: p.name })),
     };

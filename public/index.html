@@ -41,7 +41,7 @@
           </label>
           <details class="config wide" id="start-cfg">
             <summary>Starting position &amp; heading <span id="start-summary" class="muted small"></span></summary>
-            <p class="muted small">Click or drag on your KITCHEN to place the robot, then pick its heading. Used when a match starts (practice, ranked, rooms).</p>
+            <p class="muted small">Click or drag on your KITCHEN to place the robot, then pick its heading. Used when a match starts (practice and rooms).</p>
             <canvas id="setup-map"></canvas>
             <div class="setup-spots" id="setup-spots"></div>
             <div class="setup-head">
@@ -77,7 +77,6 @@
 
         <div class="menu-buttons">
           <button class="btn primary big" data-action="practice">Practice <small>offline · vs bots</small></button>
-          <button class="btn big ranked" data-action="ranked">🏆 Ranked Run <small>solo · leaderboard</small></button>
           <button class="btn big" data-action="quick">Quick Play <small>online</small></button>
           <div class="row">
             <button class="btn" data-action="create">Create Room</button>
@@ -92,15 +91,9 @@
             <button class="btn ghost" data-action="settings">Settings</button>
             <button class="btn ghost" data-action="rules">Game Rules</button>
           </div>
-          <button class="btn ghost" data-action="leaderboard">🏆 Leaderboard</button>
         </div>
         <div id="net-status" class="muted small"></div>
       </div>
-      <aside class="menu-board" id="menu-board">
-        <div class="mb-head"><h3>🏆 Top drivers</h3><span class="muted small">ranked solo runs</span></div>
-        <table class="keys lb" id="mb-table"><tr><td class="muted">Loading…</td></tr></table>
-        <button class="btn ghost" data-action="leaderboard">Full leaderboard · by mechanism</button>
-      </aside>
     </section>
 
     <!-- ============================== PRACTICE SETUP -->
@@ -241,7 +234,6 @@
         </div>
         <table class="breakdown" id="res-table"></table>
         <div class="res-rp" id="res-rp"></div>
-        <div class="res-ranked hidden" id="res-ranked"></div>
         <div class="row end">
           <button class="btn ghost" data-action="quit">Main Menu</button>
           <button class="btn primary" data-action="again">Play Again</button>
@@ -333,14 +325,6 @@
         </table>
       </div>
       <p class="small muted">Match: 15 s AUTO + 2:15 TELEOP (last 20 s = ENDGAME). 5 pieces per shelf, 3 pieces per robot (G14). Auto-called fouls: G11 contact in an opponent's KITCHEN/FARM, G12 TABLE ZONE protection in ENDGAME, G13 crossing the CENTER LINE in AUTO. Based on the Blair Bunnybots 2026 manual v1.2.</p>
-    </template>
-
-    <template id="tpl-leaderboard">
-      <h2>🏆 Leaderboard</h2>
-      <p class="muted small">Only <b>Ranked Runs</b> count: a solo match run on the server — just your robot, no bots on either alliance, house rules. Every run is listed under the driver name you typed. <b>Overall</b> ranks all runs; the other boards only runs with that scoring mechanism.</p>
-      <div class="tabs" id="lb-tabs"></div>
-      <div class="lb-wrap"><table class="keys lb" id="lb-table"></table></div>
-      <div class="row end"><button class="btn tiny ghost" id="lb-admin">Admin</button></div>
     </template>
 
     <template id="tpl-settings">

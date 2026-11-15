@@ -885,93 +885,6 @@ details.fixed .config-grid {
   pointer-events: none;
 }
 
-/* ------------------------------------------------------------------ leaderboard */
-.btn.ranked {
-  border-color: rgba(255, 216, 74, 0.5);
-  background: linear-gradient(180deg, rgba(255, 216, 74, 0.16), rgba(255, 216, 74, 0.05));
-}
-.tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin: 10px 0 12px;
-}
-.tab {
-  font: inherit;
-  font-family: var(--display);
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  font-size: 14px;
-  color: var(--muted);
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 5px 12px;
-  cursor: pointer;
-}
-.tab.on {
-  color: #1a0d00;
-  background: var(--accent);
-  border-color: var(--accent);
-}
-.lb-wrap {
-  max-height: 55vh;
-  overflow: auto;
-}
-table.lb td.score {
-  font-family: var(--display);
-  font-weight: 800;
-  font-size: 18px;
-  color: var(--accent);
-}
-table.lb tr.me td {
-  background: rgba(90, 209, 106, 0.1);
-}
-table.lb .build {
-  color: var(--muted);
-  font-size: 12px;
-}
-.res-ranked {
-  margin-top: 12px;
-  padding: 10px 14px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 216, 74, 0.45);
-  background: rgba(255, 216, 74, 0.08);
-  text-align: center;
-}
-
-#menu {
-  flex-wrap: wrap;
-  gap: 24px;
-}
-.menu-board {
-  width: min(400px, 100%);
-  margin: auto clamp(0px, 4vw, 70px) auto auto;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.mb-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-}
-.mb-head h3 {
-  margin: 0;
-}
-.menu-board table.lb td {
-  padding: 4px 6px;
-}
-.menu-board table.lb td.score {
-  font-size: 16px;
-  text-align: right;
-}
-
 /* ------------------------------------------------------------------ phone */
 @media (max-width: 720px) {
   #menu {
@@ -981,9 +894,6 @@ table.lb .build {
   }
   h1 {
     font-size: 44px;
-  }
-  .menu-board {
-    margin: 0;
   }
   .alliances,
   .two-col,

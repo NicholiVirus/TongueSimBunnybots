@@ -35,9 +35,9 @@ npm start          # http://localhost:3000
 
 Driving is field-oriented **from your camera's point of view** (driver station = like the real alliance wall).
 
-**Starting position & heading** are chosen in the main menu, next to the other robot settings (open **Starting position & heading**): click or drag on a top-down map of your KITCHEN to place the robot, then pick its heading (slider, ±15°, or face the pantry / oven / field / wall; Station 1–3 presets). The whole robot must fit inside your kitchen. The choice is saved, mirrored automatically for blue, and used by every match you start (practice, ranked, rooms) — if it doesn't fit (e.g. after switching to a bigger robot) the normal station spot is used instead. The starting load and mechanisms are set in the same menu.
+**Starting position & heading** are chosen in the main menu, next to the other robot settings (open **Starting position & heading**): click or drag on a top-down map of your KITCHEN to place the robot, then pick its heading (slider, ±15°, or face the pantry / oven / field / wall; Station 1–3 presets). The whole robot must fit inside your kitchen. The choice is saved, mirrored automatically for blue, and used by every match you start (practice and rooms) — if it doesn't fit (e.g. after switching to a bigger robot) the normal station spot is used instead. The starting load and mechanisms are set in the same menu.
 
-**Pause:** Esc freezes practice and ranked runs until you resume; shared online matches keep running.
+**Pause:** Esc freezes practice until you resume; shared online matches keep running.
 
 **Auto-align:** hold Space near your PANTRY and the robot locks its heading and distance to the shelves — you can only slide left/right, then press F. Shelves have no grid: the piece lands right where your robot is, as long as it doesn't overlap another (a small nudge against a neighbor is allowed). Near your OVEN it drives itself onto the closest mouth. When a robot carries both, cakes go to the pantry first and carrots to the oven first.
 
@@ -122,20 +122,9 @@ Built from team 526's STEP export (`public/assets/robots/526/robot526.glb`). A *
 
 To rebuild a model from a new STEP export: `pip install cadquery-ocp trimesh`, run `python3 tools/step_to_glb.py robot.step raw.glb 1.5 0.7 charles` (or `divebomb` / `526`), then `npx gltfpack -i raw.glb -o public/assets/robots/team/charles.glb -si 0.3 -cc -kn -km`. The script sorts parts into moving groups (elevator stage, carriage, arm, swerve wheels) by their names in the CAD tree. For a different team's CAD, see [`public/assets/robots/README.md`](public/assets/robots/README.md).
 
-## Ranked runs and the leaderboard
-
-- **🏆 Ranked Run** starts a solo match **on the server**: just your robot — no partners and no bots on the other alliance — with the default house rules. Only these runs count, and because the server runs the match, scores can't be edited in the browser. There are no accounts: each run is saved under the driver name typed in the menu.
-- **Leaderboard**: the top 10 show on the main menu for everyone. Each driver name appears once per robot (drivetrain + build) with its best run — again only with a different robot. The full board ranks them **Overall** and per scoring mechanism (Passthrough elevator, Hopper + separate elevator, Hopper front + elevator back, Intake-elevator + hopper). The #1 overall run is the global record.
-- **Removing runs:** in the leaderboard, click **Admin** and enter the admin key to get ✕ buttons (the key is remembered on that device). The key is set in `server/leaderboard.js`; an `ADMIN_KEY` environment variable on the host overrides it.
-
-### Where the leaderboard is saved
-
-- With `DATABASE_URL` set (any Postgres, e.g. Render Postgres, Neon or Supabase), everything is saved in one table (`hh_store`) and survives redeploys.
-- Without it, data goes to `data/data.json` (or `$DATA_DIR`). That is fine locally, but **on Render's free plan the disk is wiped on every deploy/restart** — use `DATABASE_URL` there (or a persistent disk mounted at `DATA_DIR`).
-
 ## Hosting online
 
-The server is a single Node process (Express + `ws`). Matches live in memory; the leaderboard is saved as described above.
+The server is a single Node process (Express + `ws`) and keeps everything in memory.
 
 - **LAN:** run `npm start` on one machine; others open `http://<that-machine's-IP>:3000`.
 - **Internet:** deploy to any Node host that supports WebSockets (Render, Railway, Fly.io…). Start command `npm start`; it listens on `$PORT`.
@@ -148,7 +137,7 @@ shared/   game logic used by BOTH server and browser
   sim.js      authoritative 60 Hz match sim: drive, collisions, pieces, scoring, fouls, RPs
   bot.js      A*-pathing bot drivers (fill empty slots, practice opponents)
   robots.js   robot presets (size, speed, elevator) + CAD hook
-server/   Express static host + WebSocket rooms (lobby, bots, 30 Hz snapshots), leaderboard API
+server/   Express static host + WebSocket rooms (lobby, bots, 30 Hz snapshots)
 public/   three.js client: field/robot rendering, HUD, menus, input, prediction
 test/     node --test suite (full 6-bot match, scoring, recirculation)
 ```
