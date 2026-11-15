@@ -108,6 +108,15 @@ export const ROBOTS = {
     slap: { stow: 120, ground: -5, feed: 35, oven: 20, l1: 75, speed: 300, tolerance: 8, feedTime: 0.2, pivot: [0.031, 0.248], grip: [0.641, -6], cad: 110 },
     model: { url: '/assets/robots/526/robot526.glb', rig: 'r526' },
   },
+  r709: {
+    ...base,
+    id: 'r709',
+    name: 'Team 709',
+    blurb: 'Team 709: 30" x 30" drivetrain, 110 lb. Mechanisms are configurable below until we have its CAD.',
+    length: 30 * IN + 2 * 0.085, // 30" frame + bumpers
+    width: 30 * IN + 2 * 0.085,
+    mass: 110 * 0.4536, // 110 lb
+  },
   kitbot: {
     ...base,
     id: 'kitbot',

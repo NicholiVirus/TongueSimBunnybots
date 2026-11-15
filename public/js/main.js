@@ -249,7 +249,7 @@ const actions = {
 };
 
 // ------------------------------------------------------------------ practice bot builds
-const POOL = ['team', 'divebomb', 'kitbot', 'speedy', 'tank'];
+const POOL = ['team', 'divebomb', 'r526', 'r709', 'kitbot', 'speedy', 'tank'];
 const randomBots = () => ({
   ally: [0, 1].map(() => ({ robot: POOL[Math.floor(Math.random() * POOL.length)], mods: randomMods() })),
   opp: [0, 1, 2].map(() => ({ robot: POOL[Math.floor(Math.random() * POOL.length)], mods: randomMods() })),

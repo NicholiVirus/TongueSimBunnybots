@@ -389,3 +389,18 @@ test('a saved starting pose (alliance view) is used, mirrored for blue, and igno
   const bad = mk('red', { x: 2, y: 0, th: 0 });
   assert.equal(bad.x, F.startPose('red', 2).x, 'illegal pose falls back to the default spot');
 });
+
+test('team 709: 30" x 30" frame (plus bumpers), 110 lb, configurable mechanisms', async () => {
+  const { getRobotConfig } = await import('../shared/robots.js');
+  const c = getRobotConfig('r709', { mech: 'separate', maxLevel: 2 });
+  assert.ok(Math.abs(c.length - (0.762 + 0.17)) < 1e-6 && c.width === c.length);
+  assert.ok(Math.abs(c.mass - 49.9) < 0.1);
+  assert.equal(c.mods.mech, 'separate', 'mechanisms follow the menu');
+  const m = new Match({ slots: [{ id: 'a', alliance: 'red', station: 1, robot: 'r709', bot: true }] });
+  m.bots = [new Bot('a')];
+  for (let i = 0; i < 60 * 25; i++) {
+    m.bots[0].update(m, TICK);
+    m.step(TICK);
+  }
+  assert.ok(m.score.red.totals.total > 0, 'a bot can drive it');
+});

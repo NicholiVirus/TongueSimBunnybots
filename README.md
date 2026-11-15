@@ -103,6 +103,10 @@ A second real robot, built from its STEP export (`public/assets/robots/divebomb/
 - **Depot:** with the intake stowed, line the front up under the chute and carrots drop into the beltdexer. - **Ramp:** catches and holds up to 3 carrot cakes (beltdexer 2 + end effector 1). The build is fixed in the menu. Bots can drive it.
 - Estimated from the CAD (tell me if wrong): intake feed angle, hopper carrot positions, and which intakes it has.
 
+## Team 709
+
+A **30" x 30"** drivetrain (bumper-to-bumper about 36.7") weighing **110 lb**. Its mechanisms are configurable in the menu like the other placeholder robots until we have its CAD.
+
 ## Team 526 robot
 
 Built from team 526's STEP export (`public/assets/robots/526/robot526.glb`). A **speedy swerve** (4.9 m/s) with a **slapdown ground intake** on the front that feeds a **beltdexer** (holds 3). It has no elevator: the beltdexer runs pieces back out **through the intake**.
