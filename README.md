@@ -52,7 +52,7 @@ Rules come from the Blair Bunnybots 2026 Game Manual v1.2; field geometry comes 
 - **DEPOT** (your FARM, opposite end — two chutes): park under a chute and the human player drops a carrot into your robot. 24 carrots per alliance: 5 prestaged, 2 preloaded per robot, the rest at the depot.
 - **TAXI** 2, **PARK** in your TABLE ZONE 2, **HARVEST HAUL** +1 per carrot / +3 per cake held while parked (max 3).
 - **RPs:** Win 3 / Tie 1, Stocked Up (3+ on every shelf), Baked Up (a cake on every shelf), Dinner (10+ endgame points).
-- **3 pieces per robot** (G14). Auto-called fouls: **G11** contact inside an opponent's KITCHEN/FARM, **G12** TABLE ZONE protection in ENDGAME, **G13** crossing the CENTER LINE in AUTO (minor = 4 to the opponent).
+- **3 pieces per robot** (G14). Auto-called fouls: **G11** contact inside an opponent's KITCHEN/FARM, **G12** TABLE ZONE protection in ENDGAME, **G13** crossing the CENTER LINE in AUTO, **G15** PINNING an opponent for more than 3 s (back off 6 ft to reset) (minor = 4 to the opponent).
 
 **Official competition rules** (practice setup / lobby host toggle) switches two house rules back to the manual: traded oven carrots go to the *opposing* depot, and human players can't act during AUTO (no depot feeding, trades or ramp cakes until TELEOP).
 

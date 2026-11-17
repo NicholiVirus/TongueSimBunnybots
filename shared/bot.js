@@ -2,7 +2,7 @@
 // Collect -> carrots to the OVEN, carrot cakes to the PANTRY -> park at the DINNER TABLE for ENDGAME.
 
 import * as F from './field.js';
-import { shelfFit } from './sim.js';
+import { shelfFit, PIN_RELEASE } from './sim.js';
 import { isOneAtATime, shelfSide, hasGripper, hasRearTrader } from './robots.js';
 
 const CELL = 0.2;
@@ -199,6 +199,7 @@ export class Bot {
     this.id = robotId;
     this.skill = skill;
     this.task = null;
+    this.leaveAlone = new Map(); // robot id -> time we may defend it again
     this.path = null;
     this.replanAt = 0;
     this.stuckT = 0;
@@ -212,9 +213,34 @@ export class Bot {
     const inp = { mx: 0, my: 0, rot: 0, intake: false, score: false, eject: false, sp: null, autoStow: true };
     if (!m.enabled) return m.setInput(this.id, inp);
 
-    if (m.time >= this.thinkAt || !this.task || this.task.done) {
+    if ((m.time >= this.thinkAt && this.task?.kind !== 'release') || !this.task || this.task.done) {
       this.task = this.chooseTask(m, r);
       this.thinkAt = m.time + 0.5;
+    }
+    if (this.task && this.task.kind === 'defend') {
+      // G15: let go well before a pin hits 3 s, and if our push has shoved it at our own zones, let it out
+      const o = m.robotById(this.task.target);
+      const ownZones = [F.kitchenPoly(r.alliance), F.farmPoly(r.alliance), F.tableZonePoly(r.alliance)];
+      const gap = o ? Math.hypot(o.x - r.x, o.y - r.y) - (r.cfg.length + o.cfg.length) / 2 : Infinity;
+      if (o && (m.pinTime(r) > 1.5 || (gap < 0.2 && nearZone(o.x, o.y, ownZones, Math.max(o.cfg.length, o.cfg.width) / 2 + 0.6)))) {
+        const d = Math.hypot(r.x - o.x, r.y - o.y) || 1;
+        const back = (r.cfg.length + o.cfg.length) / 2 + PIN_RELEASE + 0.4;
+        const gx = o.x + ((r.x - o.x) / d) * back;
+        const gy = o.y + ((r.y - o.y) / d) * back;
+        this.leaveAlone.set(o.id, m.time + 5);
+        this.task = {
+          kind: 'release',
+          target: o.id,
+          goal: [Math.max(-F.FIELD.halfL + 0.6, Math.min(F.FIELD.halfL - 0.6, gx)), Math.max(-F.FIELD.halfW + 0.6, Math.min(F.FIELD.halfW - 0.6, gy))],
+          direct: false,
+          since: m.time,
+        };
+      }
+    }
+    if (this.task && this.task.kind === 'release') {
+      const o = m.robotById(this.task.target);
+      const gap = o ? Math.hypot(o.x - r.x, o.y - r.y) - (r.cfg.length + o.cfg.length) / 2 : Infinity;
+      if (gap > PIN_RELEASE + 0.1 || m.time - this.task.since > 4) this.task.done = true;
     }
     const t = this.task;
     if (!t) return m.setInput(this.id, inp);
@@ -548,7 +574,11 @@ export class Bot {
     if (m.isEndgame) return { ...this.parkSpot(r), kind: 'park', since: m.time }; // ENDGAME: no shoving near the table (G12), go park
     const opp = m.robots.filter((o) => o.alliance !== r.alliance);
     const own = [F.kitchenPoly(r.alliance), F.farmPoly(r.alliance), F.tableZonePoly(r.alliance)];
-    const safe = (o) => !protectedZone(o) && !nearZone(o.x, o.y, [F.kitchenPoly(o.alliance), F.farmPoly(o.alliance)], 0.5) && !nearZone(o.x, o.y, own, Math.max(o.cfg.length, o.cfg.width) / 2 + 0.8);
+    const safe = (o) =>
+      !((this.leaveAlone.get(o.id) || 0) > m.time) &&
+      !protectedZone(o) &&
+      !nearZone(o.x, o.y, [F.kitchenPoly(o.alliance), F.farmPoly(o.alliance)], 0.5) &&
+      !nearZone(o.x, o.y, own, Math.max(o.cfg.length, o.cfg.width) / 2 + 0.8);
     const allies = m.robots.filter((o) => o.alliance === r.alliance && o !== r && !o.cfg.driveOnly);
     // counter-defence: an opposing drive base that is harassing one of our scorers
     let target = opp.find((o) => o.cfg.driveOnly && safe(o) && allies.some((a) => Math.hypot(a.x - o.x, a.y - o.y) < 1.6));

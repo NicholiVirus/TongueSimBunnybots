@@ -487,3 +487,36 @@ test("a 709 defender never shoves its target toward the defender's own zones", (
   assert.ok(closest > -0.05, "pushed into red's kitchen");
   assert.equal(m.fouls.filter((f) => f.alliance === 'red').length, 0);
 });
+
+test('G15: pinning an opponent for more than 3 s is a foul, and 709 bots let go before that', () => {
+  const slots = [
+    { id: 'red1', alliance: 'red', station: 1, robot: 'r709' },
+    { id: 'blue2', alliance: 'blue', station: 2, robot: 'kitbot' },
+  ];
+  const m = new Match({ slots, preload: 0 });
+  while (m.phase !== 'teleop') m.step();
+  const [d, o] = m.robots;
+  // a human 709 holds a robot against the side wall
+  Object.assign(o, { x: 0, y: -F.FIELD.halfW + 0.45, th: 0 });
+  Object.assign(d, { x: 0, y: o.y + 0.9, th: 0 });
+  for (let i = 0; i < 60 * 3.5; i++) {
+    m.setInput('red1', { mx: 0, my: -1 });
+    m.step(TICK);
+  }
+  assert.ok(
+    m.fouls.some((f) => f.rule === 'G15' && f.offender === 'red1'),
+    'pin not called',
+  );
+
+  // the same pin by a bot: it backs off before the 3 s count runs out
+  const m2 = new Match({ slots: slots.map((s) => (s.id === 'red1' ? { ...s, bot: true } : s)), preload: 0 });
+  m2.bots = [new Bot('red1')];
+  while (m2.phase !== 'teleop') m2.step();
+  Object.assign(m2.robots[1], { x: 0, y: -F.FIELD.halfW + 0.45, th: 0 });
+  Object.assign(m2.robots[0], { x: 0, y: m2.robots[1].y + 0.9, th: 0 });
+  for (let i = 0; i < 60 * 15; i++) {
+    m2.bots[0].update(m2, TICK);
+    m2.step(TICK);
+  }
+  assert.equal(m2.fouls.filter((f) => f.rule === 'G15').length, 0);
+});

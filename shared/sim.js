@@ -121,6 +121,8 @@ function circleBox(px, py, rad, b) {
 }
 
 const STATIC = F.staticObstacles();
+export const PIN_TIME = 3.0; // s
+export const PIN_RELEASE = 1.8; // m (6 ft) gap that ends a pin
 
 // ------------------------------------------------------------------ drivetrain (shared with client prediction)
 export function driveStep(r, inp, dt, enabled = true) {
@@ -324,6 +326,7 @@ export class Match {
     this.events = [];
     this.fouls = [];
     this.foulCooldown = new Map();
+    this.pins = new Map(); // `${pinner}>${victim}` -> seconds pinned (G15)
     this.result = null;
     this.tick = 0;
 
@@ -1459,6 +1462,8 @@ export class Match {
       }
     }
 
+    this.checkPins();
+
     for (const [a, b] of this.contacts || []) {
       if (a.alliance === b.alliance) continue;
       for (const [p, q] of [
@@ -1486,6 +1491,49 @@ export class Match {
         }
       }
     }
+  }
+
+  // G15 — PINNING: holding an opponent still against the field / another robot for more than 3 s is a minor foul;
+  // the count only resets once the pinner backs off 6 ft (1.8 m), and keeps pinning earns another foul every 3 s
+  checkPins() {
+    const touching = new Set();
+    for (const [a, b] of this.contacts || []) {
+      if (a.alliance === b.alliance) continue;
+      for (const [p, q] of [
+        [a, b],
+        [b, a],
+      ]) {
+        const dx = q.x - p.x;
+        const dy = q.y - p.y;
+        const d = Math.hypot(dx, dy) || 1;
+        const inp = p.input || {};
+        const pushing = ((inp.mx || 0) * dx + (inp.my || 0) * dy) / d > 0.3; // pinner driving into it
+        const stuck = Math.hypot(q.vx, q.vy) < 0.35;
+        if (!pushing || !stuck) continue;
+        const key = `${p.id}>${q.id}`;
+        touching.add(key);
+        const t = (this.pins.get(key) || 0) + TICK;
+        this.pins.set(key, t);
+        if (t >= PIN_TIME) {
+          this.foul(p, q, 'G15', 'PINNING for more than 3 s', 'minor');
+          this.pins.set(key, 0);
+        }
+      }
+    }
+    for (const key of [...this.pins.keys()]) {
+      if (touching.has(key)) continue;
+      const [pid, qid] = key.split('>');
+      const p = this.robotById(pid);
+      const q = this.robotById(qid);
+      if (!p || !q || Math.hypot(p.x - q.x, p.y - q.y) - (p.cfg.length + q.cfg.length) / 2 > PIN_RELEASE) this.pins.delete(key);
+    }
+  }
+
+  // how long robot `p` has been pinning anyone (for bots that want to let go in time)
+  pinTime(p) {
+    let t = 0;
+    for (const [k, v] of this.pins) if (k.startsWith(p.id + '>')) t = Math.max(t, v);
+    return t;
   }
 
   foul(offender, victim, rule, desc, kind) {
