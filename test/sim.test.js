@@ -458,3 +458,32 @@ test('team 709 bots play defence on opposing scorers, and only counter-defend an
   place(scorer, -7.0, 1.0); // safe in its own kitchen
   assert.notEqual(bot.defenseTask(m, d).kind, 'defend', 'never chases a robot into its protected zone');
 });
+
+test("a 709 defender never shoves its target toward the defender's own zones", () => {
+  const slots = [
+    { id: 'red1', alliance: 'red', station: 1, robot: 'r709', bot: true },
+    { id: 'blue2', alliance: 'blue', station: 2, robot: 'kitbot' },
+  ];
+  const m = new Match({ slots, preload: 0 });
+  m.bots = [new Bot('red1')];
+  while (m.phase !== 'teleop') m.step();
+  const [d, o] = m.robots;
+  // blue robot parked just outside RED's kitchen, red defender on the field side of it
+  Object.assign(o, { x: 4.2, y: 1.0, th: 0 });
+  Object.assign(d, { x: 2.2, y: 1.0, th: 0 });
+  let closest = Infinity;
+  for (let i = 0; i < 60 * 6; i++) {
+    m.bots[0].update(m, TICK);
+    m.step(TICK);
+    const hw = o.cfg.length / 2;
+    const box = [
+      [o.x - hw, o.y - hw],
+      [o.x + hw, o.y - hw],
+      [o.x + hw, o.y + hw],
+      [o.x - hw, o.y + hw],
+    ];
+    if (F.polysOverlap(box, F.kitchenPoly('red'))) closest = Math.min(closest, -1);
+  }
+  assert.ok(closest > -0.05, "pushed into red's kitchen");
+  assert.equal(m.fouls.filter((f) => f.alliance === 'red').length, 0);
+});

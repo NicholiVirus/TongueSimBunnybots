@@ -221,10 +221,42 @@ export class Bot {
     if (t.kind === 'defend') {
       // follow the robot being defended; give up once it reaches a protected zone
       const o = m.robotById(t.target);
-      if (!o || protectedZone(o)) t.done = true;
+      const ownZones = [F.kitchenPoly(r.alliance), F.farmPoly(r.alliance), F.tableZonePoly(r.alliance)];
+      if (!o || protectedZone(o) || nearZone(o.x, o.y, ownZones, Math.max(o.cfg.length, o.cfg.width) / 2 + 0.6))
+        t.done = true; // too close to OUR zones: back off
       else {
-        t.goal = [o.x, o.y];
-        t.direct = Math.hypot(o.x - r.x, o.y - r.y) < 1.6; // close: drive straight at it
+        // never shove it toward our own KITCHEN / FARM / TABLE ZONE: if driving straight at it would, swing
+        // round to the side the zone is on first and push it away from the zone instead
+        const zones = ownZones;
+        const oh = Math.max(o.cfg.length, o.cfg.width) / 2 + 0.1;
+        const okDir = (ux, uy) => !nearZone(o.x + ux * 1.6, o.y + uy * 1.6, zones, oh);
+        const dd = Math.hypot(o.x - r.x, o.y - r.y) || 1;
+        const ux = (o.x - r.x) / dd;
+        const uy = (o.y - r.y) / dd;
+        if (okDir(ux, uy)) {
+          t.setup = false;
+          t.goal = [o.x, o.y];
+          t.direct = dd < 1.6; // close: drive straight at it
+        } else {
+          let best = null;
+          let bd = -Infinity;
+          for (let k = 0; k < 24; k++) {
+            const a = (k / 24) * Math.PI * 2;
+            const c = [Math.cos(a), Math.sin(a)];
+            const dot = c[0] * ux + c[1] * uy;
+            if (okDir(c[0], c[1]) && dot > bd) {
+              bd = dot;
+              best = c;
+            }
+          }
+          if (!best) t.done = true;
+          else {
+            const sep = (r.cfg.length + o.cfg.length) / 2 + 0.3;
+            t.setup = true; // get into position without touching it
+            t.goal = [o.x - best[0] * sep, o.y - best[1] * sep];
+            t.direct = false;
+          }
+        }
       }
     }
 
@@ -255,14 +287,14 @@ export class Bot {
     const d = Math.hypot(dx, dy);
     const remaining = Math.hypot(target[0] - r.x, target[1] - r.y) + (finalLeg ? 0 : Math.hypot(t.goal[0] - target[0], t.goal[1] - target[1]));
     const vmax = r.cfg.maxSpeed * this.skill;
-    const speed = t.kind === 'defend' ? vmax : Math.min(vmax, Math.sqrt(2 * r.cfg.accel * 0.6 * Math.max(remaining - 0.02, 0)) + (finalLeg ? 0.05 : 0.6));
+    const speed = t.kind === 'defend' && !t.setup ? vmax : Math.min(vmax, Math.sqrt(2 * r.cfg.accel * 0.6 * Math.max(remaining - 0.02, 0)) + (finalLeg ? 0.05 : 0.6));
     if (d > 1e-3) {
       dx /= d;
       dy /= d;
     }
     // avoid other robots — and give opponents a wide berth in ENDGAME (G11/G12 fouls)
     for (const o of m.robots) {
-      if (o === r || (t.kind === 'defend' && o.id === t.target)) continue; // (a defender drives into its target)
+      if (o === r || (t.kind === 'defend' && !t.setup && o.id === t.target)) continue; // (a defender drives into its target)
       const ox = r.x - o.x;
       const oy = r.y - o.y;
       const od = Math.hypot(ox, oy);
@@ -515,7 +547,8 @@ export class Bot {
     if (m.phase !== 'teleop') return { kind: 'idle', goal: [s * 3.2, 0.5 * (r.station - 2)], since: m.time }; // AUTO: just taxi
     if (m.isEndgame) return { ...this.parkSpot(r), kind: 'park', since: m.time }; // ENDGAME: no shoving near the table (G12), go park
     const opp = m.robots.filter((o) => o.alliance !== r.alliance);
-    const safe = (o) => !protectedZone(o) && !nearZone(o.x, o.y, [F.kitchenPoly(o.alliance), F.farmPoly(o.alliance)], 0.5);
+    const own = [F.kitchenPoly(r.alliance), F.farmPoly(r.alliance), F.tableZonePoly(r.alliance)];
+    const safe = (o) => !protectedZone(o) && !nearZone(o.x, o.y, [F.kitchenPoly(o.alliance), F.farmPoly(o.alliance)], 0.5) && !nearZone(o.x, o.y, own, Math.max(o.cfg.length, o.cfg.width) / 2 + 0.8);
     const allies = m.robots.filter((o) => o.alliance === r.alliance && o !== r && !o.cfg.driveOnly);
     // counter-defence: an opposing drive base that is harassing one of our scorers
     let target = opp.find((o) => o.cfg.driveOnly && safe(o) && allies.some((a) => Math.hypot(a.x - o.x, a.y - o.y) < 1.6));
