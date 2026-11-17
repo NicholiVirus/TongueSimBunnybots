@@ -156,3 +156,19 @@ test('oven: line up and press F, no oven button needed', () => {
   run(m, 3);
   assert.equal(m.score.red.ovenCarrot, 2, 'both carrots shot into the oven');
 });
+
+test('526 bot does not get stuck at the pantry (shelf already has carrots)', () => {
+  const m = new Match({ slots: [{ id: 'a', alliance: 'red', station: 1, robot: 'r526', bot: true }] });
+  m.bots = [new Bot('a')];
+  for (const x of [F.pantrySlotX(1, 1), F.pantrySlotX(2, 1)]) {
+    const p = m.addPiece('carrot', x, 4.0, 0, 'shelf');
+    p.z = F.PANTRY.shelfZ[0];
+    m.pantry.red[0].push(p.id);
+  }
+  for (let i = 0; i < 60 * 25; i++) {
+    m.bots[0].update(m, TICK);
+    m.step(TICK);
+  }
+  const scored = m.pantry.red[0].length - 2 + m.score.red.ovenCarrot;
+  assert.ok(scored >= 2, `it keeps scoring (${scored})`);
+});

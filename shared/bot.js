@@ -301,7 +301,8 @@ export class Bot {
     this.keepOutOfOpponentZones(r, inp);
 
     // task actions
-    if (t.sp && remaining < 1.6) inp.sp = isOneAtATime(r.cfg.mods) && (t.kind === 'pantry' || (t.kind === 'oven' && shelfSide(r.cfg.mods) < 0)) && !r.carriage ? 'stow' : t.sp; // separate elevator reloads low
+    if (t.sp && remaining < 1.6)
+      inp.sp = isOneAtATime(r.cfg.mods) && r.cfg.mods.mech !== 'gtake' && (t.kind === 'pantry' || (t.kind === 'oven' && shelfSide(r.cfg.mods) < 0)) && !r.carriage ? 'stow' : t.sp; // (526 loads its arm while L1 is selected) // separate elevator reloads low
     if (t.kind === 'collect' || t.kind === 'table') {
       inp.intake = remaining < 1.5;
       inp.sp = 'stow';
@@ -343,6 +344,11 @@ export class Bot {
       }
     }
     if ((t.kind === 'pantry' || t.kind === 'oven') && r.held.length !== t.heldAtStart) t.done = true;
+    // never get bricked: a scoring trip that hasn't scored in 8 s is dropped, and the shelves are skipped for a bit
+    if ((t.kind === 'pantry' || t.kind === 'oven') && m.time - t.since > 8) {
+      t.done = true;
+      if (t.kind === 'pantry') this.skipPantryUntil = m.time + 10;
+    }
     if (t.kind === 'park') {
       inp.sp = 'stow';
       if (remaining < 0.1) {
@@ -605,6 +611,7 @@ export class Bot {
     const prefer = pb.x0 + ((pb.x1 - pb.x0) * (r.station - 0.5)) / 3;
     const fit = (l) => shelfFit(m.shelfXs(a, l), prefer, a);
     let level = -1;
+    if (m.time < (this.skipPantryUntil || 0)) levels.length = 0; // just gave up on the shelves: use the oven
     if (heldTop.type === 'cake') level = levels.find((l) => !hasCake(l) && fit(l) !== null) ?? levels.find((l) => pantry[l].length < 3 && fit(l) !== null) ?? levels.find((l) => fit(l) !== null) ?? -1;
     const half = r.cfg.length / 2;
     if (level >= 0) {
